@@ -1,10 +1,8 @@
 import * as path from "node:path"
-import { exec } from "node:child_process"
 import { platform } from "node:os"
 
 import winston from "winston"
-import { BugSplatNode as BugSplat } from "bugsplat-node"
-import { app, globalShortcut, crashReporter, ipcMain, Menu } from "electron"
+import { app, globalShortcut, ipcMain } from "electron"
 
 import {
     APP_SETTINGS,
@@ -21,13 +19,8 @@ import { build } from "../site-generator.js"
 import { resolveHandle as resolveBlueskyHandle } from "../bluesky/main.js"
 import { createNewProject, activeProject } from "../index.js"
 import { checkVersion, CURRENT_VERSION } from "./version.js"
-import {
-    initializeTray,
-    showUpdateNoticeInTray,
-    updateTrayTitle,
-} from "./tray.js"
-
-let bugsplat = null
+import { initializeTray, rebuildTray, showUpdateNoticeInTray } from "./tray.js"
+import { configureCrashReporting } from "./bugsplat.js"
 
 configureCrashReporting()
 
@@ -48,9 +41,9 @@ app.whenReady().then(() => {
         app.dock.hide()
     }
 
-    initializeTray()
-
     projects.cleanup()
+
+    initializeTray()
 
     globalShortcut.register("CommandOrControl+Alt+R", clearConfig)
 
@@ -80,45 +73,11 @@ app.on("web-contents-created", (event, contents) => {
     })
 })
 
-// TODO move out of this file
-export function configureCrashReporting() {
-    const javaScriptErrorHandler = async (error) => {
-        await bugsplat.post(error)
-        app.quit()
-    }
-
-    bugsplat = APP_SETTINGS.get("settings.submitCrashLogs")
-        ? new BugSplat("me-iznaut-com", "bimbo", CURRENT_VERSION)
-        : null
-
-    if (bugsplat && !config.DEV_MODE) {
-        bugsplat.setDefaultAdditionalFilePaths([LOG_PATH])
-
-        crashReporter.start({
-            submitURL: urls.bugsplat,
-            ignoreSystemCrashHandler: true,
-            uploadToServer: true,
-            rateLimit: false,
-            globalExtra: {
-                product: "bimbo",
-                version: CURRENT_VERSION,
-                key: "en-US",
-            },
-        })
-
-        process.on("unhandledRejection", javaScriptErrorHandler)
-        process.on("uncaughtException", javaScriptErrorHandler)
-    } else {
-        process.removeListener("unhandledRejection", javaScriptErrorHandler)
-        process.removeListener("uncaughtException", javaScriptErrorHandler)
-    }
-}
-
 export function clearConfig() {
     logger.info(strings.logMsg.configClearTry)
     APP_SETTINGS.clear()
     projects.activeIndex = -1
-    updateTrayTitle(strings.projects.notLoaded)
+    rebuildTray()
     showMessageBox(strings.app.configClear)
     logger.info(strings.logMsg.configClearSuccess)
 }
@@ -153,7 +112,7 @@ function handleNewProjectForm(formData) {
 
     // TODO bug: tray title and project list not being updated
 
-    updateTrayTitle()
+    rebuildTray()
 }
 
 async function handleDeployForm(formData) {
@@ -169,7 +128,7 @@ async function handleDeployForm(formData) {
                 },
             }
             break
-        case "neocities":
+        case "neocities": {
             const API_KEY = await getNeocitiesApiKey(
                 formData.username,
                 formData.password,
@@ -186,6 +145,7 @@ async function handleDeployForm(formData) {
                 },
             }
             break
+        }
         case "other":
             newSecrets = {
                 deployment: {

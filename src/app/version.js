@@ -1,8 +1,8 @@
-import { app } from "electron"
 import tiny from "tiny-json-http"
 import { compareVersions } from "compare-versions"
 import { showNotification } from "./electron.js"
 import config from "../config/index.js"
+import urls from "../config/urls.js"
 import strings from "../config/strings.js"
 
 import pkg from "../../package.json" with { type: "json" }

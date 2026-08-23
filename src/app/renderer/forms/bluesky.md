@@ -25,3 +25,5 @@ fields:
 <div class="block">
     after a successful deployment, the "tbd" will be replaced with the Bluesky post's ID. if you would like to show replies to the Bluesky post as "comments" at the bottom of the page, add <code>comments: true</code>
 </div>
+
+<!-- TODO rewrite this in bluesky.html -->

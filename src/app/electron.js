@@ -1,14 +1,8 @@
-import { readFileSync } from "node:fs"
 import * as path from "node:path"
-import { app, dialog, Menu, Notification, shell } from "electron"
+import { app, dialog, Notification, shell } from "electron"
 import { Conf } from "electron-conf/main"
 
 import config from "../config/index.js"
-import {
-    getFrontMatterFromFile,
-    renderMdToHtml,
-    renderFormToHtml,
-} from "../templater.js"
 import strings from "../config/strings.js"
 import { trustedExternalURLs } from "../config/urls.js"
 

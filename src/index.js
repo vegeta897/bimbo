@@ -5,11 +5,8 @@ import winston from "winston"
 import { parse as yamlParse, stringify as yamlStringify } from "yaml"
 
 import config from "./config/index.js"
-import { watch } from "./site-generator.js"
 import strings from "./config/strings.js"
 import { PROJECT_CONFIG_OPTIONS } from "./front-matter.js"
-
-import { fileURLToPath } from "url"
 
 global.logger = winston.createLogger({
     level: "info",

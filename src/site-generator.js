@@ -3,10 +3,10 @@ import * as fs from "node:fs"
 
 import _ from "lodash"
 import { parse as yamlParse } from "yaml"
-import moment from "moment"
+// import moment from "moment"
 import { Feed } from "feed"
-import * as cheerio from "cheerio"
-import * as feather from "feather-icons"
+// import * as cheerio from "cheerio"
+// import * as feather from "feather-icons"
 import { createServer } from "vite"
 import chokidar from "chokidar"
 import { readingTime } from "reading-time-estimator"
@@ -15,11 +15,11 @@ import { activeProject } from "./index.js"
 import config from "./config/index.js"
 import strings from "./config/strings.js" // TODO export separate categories? (e.g. {generator} from strings)
 import {
-    queuePost,
-    setupDomainVerification,
+    // queuePost,
+    // setupDomainVerification,
     arePostsQueued,
     submitQueuedPosts,
-    resolveHandle,
+    // resolveHandle,
 } from "./bluesky/main.js"
 import { compile, getFrontMatterFromFile, renderMdToHtml } from "./templater.js"
 
@@ -74,6 +74,7 @@ export async function build(isPostDeploy = false) {
                 if (path.extname(filepath) == ".txt") {
                     buildData._data[dataName] = rawData.split("\n")
                 }
+                // eslint-disable-next-line no-unused-vars
             } catch (e) {
                 logger.warn("failed to parse data from " + dataName) // TODO string
             }
@@ -224,7 +225,7 @@ export async function build(isPostDeploy = false) {
 
     // TODO move this stuff out
     const bskyHandle = buildData.integrations?.bluesky?.handle
-    let bskyUserId = buildData.integrations?.bluesky?.userId
+    // const bskyUserId = buildData.integrations?.bluesky?.userId
 
     if (bskyHandle) {
         // TODO never exists bc _site gets wiped every build
@@ -454,7 +455,7 @@ async function processBlueskyPosts() {
     const { userId } = activeProject.secrets.integrations.bluesky
     const SKEETS_DATA = await submitQueuedPosts()
 
-    let index = 0
+    // let index = 0
 
     // TODO test
     _.each(SKEETS_DATA, ({ id }, filepath) => {
@@ -480,7 +481,7 @@ async function processBlueskyPosts() {
             ),
         )
 
-        index++
+        // index++
     })
 }
 

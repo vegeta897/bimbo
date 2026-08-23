@@ -4,10 +4,8 @@ import SftpClient from "ssh2-sftp-client"
 import * as path from "node:path"
 import * as fs from "node:fs"
 import { zip } from "zip-a-folder"
-import { setTimeout } from "timers/promises"
 
 import strings from "./config/strings.js"
-import config from "./config/index.js"
 import { arePostsQueued } from "./bluesky/main.js"
 import { build, pauseWatcher, watch } from "./site-generator.js"
 

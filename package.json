@@ -45,9 +45,12 @@
     },
     "devDependencies": {
         "@electron/packager": "^18.4.4",
+        "@eslint/js": "^10.0.1",
         "@poliklot/prettier-plugin-handlebars": "^0.3.2",
         "electron": "^40.10.6",
         "electronmon": "^2.0.4",
+        "eslint": "^10.9.0",
+        "globals": "^17.11.0",
         "prettier": "^3.9.6",
         "vitest": "^4.1.10"
     },
