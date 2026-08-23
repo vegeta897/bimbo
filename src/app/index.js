@@ -110,8 +110,6 @@ function handleNewProjectForm(formData) {
 
     projects.activeIndex = projects.add(destinationPath)
 
-    // TODO bug: tray title and project list not being updated
-
     rebuildTray()
 }
 
