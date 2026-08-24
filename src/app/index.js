@@ -19,7 +19,11 @@ import { build } from "../site-generator.js"
 import { resolveHandle as resolveBlueskyHandle } from "../bluesky/main.js"
 import { createNewProject, activeProject } from "../index.js"
 import { checkVersion, CURRENT_VERSION } from "./version.js"
-import { initializeTray, rebuildTray, showUpdateNoticeInTray } from "./tray.js"
+import {
+    initializeTray,
+    rebuildTray,
+    showUpdateNoticeInTray,
+} from "./tray/index.js"
 import { configureCrashReporting } from "./bugsplat.js"
 
 configureCrashReporting()
