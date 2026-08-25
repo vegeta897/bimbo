@@ -31,30 +31,36 @@ const exports = {
     set list(value) {
         APP_SETTINGS.set("projects", value)
     },
-    cleanup() {
-        // remove invalid paths
-        const SAVED_PROJECT_PATHS = this.list.filter((rootPath) => {
-            const FILE_EXISTS = existsSync(
-                pathJoin(rootPath, config.PROJECT_PATHS.CONFIG_FILE),
+    initialize() {
+        const cleanedList = []
+        let newActiveIndex = this.activeIndex
+
+        this.list.forEach((projectPath, index) => {
+            const projectExists = existsSync(
+                pathJoin(projectPath, config.PROJECT_PATHS.CONFIG_FILE),
             )
-
-            if (!FILE_EXISTS) {
-                logger.warn(strings.logMsg.missingProject(rootPath))
-                showMessageBox(strings.projects.missing(rootPath))
+            if (projectExists) {
+                cleanedList.push(projectPath)
+                return
             }
-
-            return FILE_EXISTS
+            logger.warn(strings.logMsg.missingProject(projectPath))
+            showMessageBox(strings.projects.missing(projectPath))
+            // if removing this project offsets the active index, shift it
+            if (index <= this.activeIndex) {
+                newActiveIndex--
+            }
         })
-
-        // save updated list
-        this.list = SAVED_PROJECT_PATHS
-
-        // if no valid projects
-        if (SAVED_PROJECT_PATHS.length == 0) {
-            this.activeIndex = -1
-        } else {
-            this.activeIndex = SAVED_PROJECT_PATHS.length - 1
+        this.list = cleanedList
+        // set active project to last if index out of bounds
+        // this should never actually occur, but
+        if (newActiveIndex >= this.list.length) {
+            newActiveIndex = this.list.length - 1
         }
+        // unload if no projects in list
+        if (cleanedList.length === 0) {
+            newActiveIndex = -1
+        }
+        this.activeIndex = newActiveIndex // this loads the project
     },
     getFromPath(rootPath) {
         return new Project(rootPath)

@@ -45,7 +45,7 @@ app.whenReady().then(() => {
         app.dock.hide()
     }
 
-    projects.cleanup()
+    projects.initialize()
 
     initializeTray()
 
