@@ -10,7 +10,7 @@ export const APP_PATH = app.getAppPath()
 export const USER_DATA_PATH = app.getPath("userData")
 export const LOG_PATH = path.join(app.getPath("userData"), config.LOG_FILENAME)
 
-export const APP_SETTINGS = new Conf(config.APP_SETTINGS_DEFAULTS)
+export const APP_SETTINGS = new Conf({ defaults: config.APP_SETTINGS_DEFAULTS })
 
 export function openExternalUrl(url) {
     if (trustedExternalURLs.includes(url)) {
