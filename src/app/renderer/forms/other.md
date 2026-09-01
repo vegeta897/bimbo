@@ -4,7 +4,7 @@ formType: deploy
 id: other
 fields:
     - {
-          id: "provider",
+          id: "name",
           placeholder: "provider name",
           helpText: 'provider name can be anything - just determines how the menu item appears (e.g. "upload to My Cool Webhost")',
       }
@@ -29,7 +29,7 @@ fields:
       }
     - {
           id: password,
-          helpText: "password for your SFTP-enabled username (again, may be different than your host's web login)",
+          helpText: "password for your SFTP-enabled username (this will not be saved)",
       }
 ---
 

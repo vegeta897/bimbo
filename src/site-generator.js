@@ -1,5 +1,6 @@
 import * as path from "node:path"
 import * as fs from "node:fs"
+import { rm } from "node:fs/promises"
 
 import _ from "lodash"
 import { parse as yamlParse } from "yaml"
@@ -46,7 +47,11 @@ export async function build(isPostDeploy = false) {
 
     // delete previous build
     if (fs.existsSync(PROJECT_PATHS.OUTPUT)) {
-        fs.rmSync(PROJECT_PATHS.OUTPUT, { recursive: true, force: true })
+        await rm(PROJECT_PATHS.OUTPUT, {
+            recursive: true,
+            force: true,
+            maxRetries: 10, // sometimes files are temporarily locked
+        })
     }
     fs.mkdirSync(PROJECT_PATHS.OUTPUT)
 

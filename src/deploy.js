@@ -1,73 +1,52 @@
+import * as path from "node:path"
+import * as fs from "node:fs"
 import { NeocitiesAPIClient } from "async-neocities"
 import NekowebAPI from "@indiefellas/nekoweb-api"
 import SftpClient from "ssh2-sftp-client"
-import * as path from "node:path"
-import * as fs from "node:fs"
 import { zip } from "zip-a-folder"
-
 import strings from "./config/strings.js"
-import { arePostsQueued } from "./bluesky/main.js"
-import { build, pauseWatcher, watch } from "./site-generator.js"
-
+// import { arePostsQueued } from "./bluesky/main.js"
+import { pauseWatcher, watch } from "./site-generator.js"
 import { activeProject } from "./index.js"
 
 export const IS_PLUS_MODE = true
 
-export const presets = {
-    // TODO these values aren't being used anywhere
-    nekoweb: {
-        apiKey: "",
-        domain: "",
-    },
-    neocities: {
-        apiKey: "",
-    },
-    other: {
-        host: "",
-        port: 22,
-        siteRoot: "",
-        username: "",
-        keyPath: "",
-    },
-}
+export const deployMethods = ["nekoweb", "neocities", "other"]
 
-export async function deploy(isPostDeploy = false) {
-    if (isPostDeploy) {
-        logger.info(strings.logMsg.postDeployStart)
-    } else {
-        logger.info(strings.logMsg.deployStart)
-    }
+export async function deploy(ephemeral = {}) {
+    logger.info(strings.logMsg.deployStart)
 
     await pauseWatcher()
 
-    const DEPLOY_META = activeProject.secrets.deployment
+    // merge saved deployment meta and ephemeral properties into a new object
+    const deployConfig = {
+        ...activeProject.secrets.deployment,
+        ...ephemeral,
+    }
 
     let success = false
-    let startMsg = strings.deployment.start(DEPLOY_META.provider)
+    const startMsg = strings.deployment.start(deployConfig.provider)
     logger.info(startMsg)
     // TODO how to surface these to electron
+    // vegeta: do it in the place(s) that call deploy()
     // showNotification(startMsg)
 
-    if (
-        DEPLOY_META.provider === "other" &&
-        (DEPLOY_META.password || DEPLOY_META.keyPath)
-    ) {
-        success = await deployViaSftp(DEPLOY_META, activeProject.paths.ROOT)
-    } else {
-        switch (DEPLOY_META.provider) {
-            case "nekoweb":
-                success = await deployToNekoweb(DEPLOY_META)
-                break
-            case "neocities":
-                success = await deployToNeocities(DEPLOY_META)
-                break
-            default:
-                break
-        }
+    switch (deployConfig.provider) {
+        case "nekoweb":
+            success = await deployToNekoweb(deployConfig)
+            break
+        case "neocities":
+            success = await deployToNeocities(deployConfig)
+            break
+        case "other":
+            success = await deployViaSftp(deployConfig)
+            break
+        default:
+            break
     }
 
     let resultMsg = success
-        ? strings.deployment.finish.success(isPostDeploy)
+        ? strings.deployment.finish.success()
         : strings.deployment.finish.fail
     logger.info(resultMsg)
     // showNotification(resultMsg)
@@ -83,15 +62,15 @@ export async function deploy(isPostDeploy = false) {
 }
 
 export async function getNeocitiesApiKey(username, password) {
-    const RESPONSE = await NeocitiesAPIClient.getKey({
+    const response = await NeocitiesAPIClient.getKey({
         siteName: username,
         ownerPassword: password,
     })
 
-    if (RESPONSE.result == "success") {
+    if (response.result === "success") {
         logger.info(strings.deployment.auth.success("neocities"))
 
-        return RESPONSE.api_key
+        return response.api_key
     } else {
         logger.info(strings.deployment.auth.fail("neocities"))
 
@@ -99,9 +78,10 @@ export async function getNeocitiesApiKey(username, password) {
     }
 }
 
-async function deployToNeocities(deployMeta) {
+async function deployToNeocities(deployConfig) {
+    // TODO no css?
     try {
-        const client = new NeocitiesAPIClient(deployMeta.apiKey)
+        const client = new NeocitiesAPIClient(deployConfig.apiKey)
 
         let result = await client.deploy({
             directory: activeProject.paths.OUTPUT,
@@ -116,17 +96,17 @@ async function deployToNeocities(deployMeta) {
     }
 }
 
-async function deployToNekoweb(deployMeta) {
-    let nekoweb = new NekowebAPI({
-        apiKey: deployMeta.apiKey,
+async function deployToNekoweb(deployConfig) {
+    const nekoweb = new NekowebAPI({
+        apiKey: deployConfig.apiKey,
         logging: (logType, logMessage) => logger.info(logMessage), // TODO use logType? https://github.com/indiefellas/nekoweb-api/blob/main/src/types.ts
     })
 
-    let sitePath = activeProject.paths.OUTPUT
-    let zipPath = path.join(activeProject.paths.ROOT, "upload.zip")
+    const sitePath = activeProject.paths.OUTPUT
+    const zipPath = path.join(activeProject.paths.ROOT, "upload.zip")
 
     try {
-        await nekoweb.getSiteInfo(deployMeta.domain)
+        await nekoweb.getSiteInfo(deployConfig.domain)
     } catch {
         logger.error(strings.deployment.nekowebSiteInfoFail)
     }
@@ -136,9 +116,9 @@ async function deployToNekoweb(deployMeta) {
         const zipFile = fs.readFileSync(zipPath)
         await bigfile.append(zipFile)
         // Delete and recreate domain root to clean up old files
-        await nekoweb.delete("/" + deployMeta.domain)
-        await nekoweb.create("/" + deployMeta.domain, true)
-        const response = await bigfile.import("/" + deployMeta.domain)
+        await nekoweb.delete("/" + deployConfig.domain)
+        await nekoweb.create("/" + deployConfig.domain, true)
+        const response = await bigfile.import("/" + deployConfig.domain)
 
         fs.rmSync(zipPath)
 
@@ -158,27 +138,27 @@ async function deployToNekoweb(deployMeta) {
     // }
 }
 
-async function deployViaSftp(deployMeta, projectRootPath) {
+async function deployViaSftp(deployConfig) {
     let result = false
     const client = new SftpClient()
+    const sitePath = activeProject.paths.OUTPUT
+
     try {
         const connectConfig = {
-            host: deployMeta.host,
-            username: deployMeta.username,
+            host: deployConfig.host,
+            username: deployConfig.username,
         }
-        if (deployMeta.port) connectConfig.port = deployMeta.port
-        if (deployMeta.password) connectConfig.password = deployMeta.password
-        if (deployMeta.keyPath)
+        if (deployConfig.port) connectConfig.port = deployConfig.port
+        if (deployConfig.password)
+            connectConfig.password = deployConfig.password
+        if (deployConfig.keyPath)
             connectConfig.privateKey = fs.readFileSync(
-                deployMeta.keyPath,
+                deployConfig.keyPath,
                 "utf-8",
             )
         await client.connect(connectConfig)
-        await client.rmdir(deployMeta.siteRoot, true).catch(() => {}) // Fail silently if dir doesn't exist
-        result = await client.uploadDir(
-            path.join(projectRootPath, "_site"), // TODO use output path
-            deployMeta.siteRoot,
-        )
+        await client.rmdir(deployConfig.siteRoot, true).catch(() => {}) // Fail silently if dir doesn't exist
+        result = await client.uploadDir(sitePath, deployConfig.siteRoot)
     } catch (err) {
         logger.error(err.message)
     }
@@ -187,10 +167,11 @@ async function deployViaSftp(deployMeta, projectRootPath) {
     return result
 }
 
-async function postDeploy() {
-    if (arePostsQueued()) {
-        logger.info(strings.deployment.queuedPosts)
-        await build(true)
-        await deploy(true)
-    }
-}
+// TODO make a better pattern for this
+// async function postDeploy() {
+//     if (arePostsQueued()) {
+//         logger.info(strings.deployment.queuedPosts)
+//         await build(true)
+//         await deploy(true)
+//     }
+// }

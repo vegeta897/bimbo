@@ -1,4 +1,4 @@
-import { presets, IS_PLUS_MODE } from "../../deploy.js"
+import { deployMethods, IS_PLUS_MODE } from "../../deploy.js"
 import strings from "../../config/strings.js"
 import { renderFormInWindow, openPageInWindow } from "../window.js"
 import { Menu } from "electron"
@@ -19,23 +19,34 @@ export function getDeployMenuItems() {
     const deployMeta = activeProject?.secrets?.deployment
     const bskyMeta = activeProject?.secrets?.integrations?.bluesky
     const bskyAutoPostEnabled = APP_SETTINGS.get("settings.bskyAutoPost")
+    const providerName = deployMeta?.name || deployMeta?.provider
     return [
         {
-            label: strings.menu.deploy(deployMeta?.provider),
+            label: strings.menu.deploy(providerName),
             visible: !!deployMeta,
             click: () => {
                 // TODO project-level setting to turn off confirmation prompt?
-                const CLICKED_ID = showPrompt(
+                const clickedId = showPrompt(
                     strings.popups.confirmDeployment.message(
                         activeProject.title,
-                        deployMeta.provider,
+                        providerName,
                     ),
                     "warning",
                 )
-
-                if (CLICKED_ID == 0) {
-                    // TODO prompt for password if necessary
-                    deploy()
+                if (clickedId == 0) {
+                    if (
+                        deployMeta.provider === "other" &&
+                        !deployMeta.keyPath
+                    ) {
+                        // need password, so use deployment form
+                        renderFormInWindow("other-password", {
+                            // TODO strings.js
+                            title: `deploy to ${providerName}`,
+                        })
+                    } else {
+                        // otherwise, ready to deploy
+                        deploy()
+                    }
                 } else {
                     logger.info(strings.deployment.finish.cancel)
                 }
@@ -47,10 +58,10 @@ export function getDeployMenuItems() {
             visible: !deployMeta,
             type: "submenu",
             submenu: Menu.buildFromTemplate(
-                Object.keys(presets).map((key) => {
+                deployMethods.map((method) => {
                     return {
-                        label: key,
-                        click: () => renderFormInWindow(key),
+                        label: method,
+                        click: () => renderFormInWindow(method),
                     }
                 }),
             ),

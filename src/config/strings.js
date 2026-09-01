@@ -112,7 +112,7 @@ export default {
         },
         start: (provider) => `starting deployment to ${provider}`,
         finish: {
-            success: (isPostDeploy) =>
+            success: (isPostDeploy = false) =>
                 `${isPostDeploy ? "post-" : ""}deployment completed successfully 💅`,
             fail: "deployment failed 🙇‍♀️",
         },

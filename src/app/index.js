@@ -16,7 +16,7 @@ import { deploy, getNeocitiesApiKey } from "../deploy.js"
 import strings from "../config/strings.js"
 import urls from "../config/urls.js"
 import { build } from "../site-generator.js"
-import { resolveHandle as resolveBlueskyHandle } from "../bluesky/main.js"
+// import { resolveHandle as resolveBlueskyHandle } from "../bluesky/main.js"
 import { createNewProject, activeProject } from "../index.js"
 import { checkVersion, CURRENT_VERSION } from "./version.js"
 import {
@@ -118,76 +118,71 @@ function handleNewProjectForm(formData) {
 }
 
 async function handleDeployForm(formData) {
-    let newSecrets = {}
+    const newSecrets = {} // saved to secrets.yaml
+    const ephemeral = {} // not saved, but required for deploy
 
     switch (formData.id) {
         case "nekoweb":
-            newSecrets = {
-                deployment: {
-                    provider: formData.id,
-                    domain: formData.domain,
-                    apiKey: formData.apiKey,
-                },
+            newSecrets.deployment = {
+                provider: formData.id,
+                domain: formData.domain,
+                apiKey: formData.apiKey,
             }
             break
         case "neocities": {
-            const API_KEY = await getNeocitiesApiKey(
+            const apiKey = await getNeocitiesApiKey(
                 formData.username,
                 formData.password,
-            ) // TODO no css?
-
-            if (!API_KEY) {
+            )
+            if (!apiKey) {
                 showMessageBox(strings.popups.deployFail(formData.id), "error")
+                break
             }
-
-            newSecrets = {
-                deployment: {
-                    provider: formData.id,
-                    apiKey: API_KEY,
-                },
+            newSecrets.deployment = {
+                provider: formData.id,
+                apiKey: apiKey,
             }
             break
         }
         case "other":
-            newSecrets = {
-                deployment: {
-                    provider: formData.id,
-                    host: formData.host,
-                    port: formData.port,
-                    siteRoot: formData.siteRoot,
-                    username: formData.username,
-                    password: formData.password, // TODO never save passwords
-                    // TODO keypath
-                },
+            newSecrets.deployment = {
+                provider: formData.id,
+                name: formData.name,
+                host: formData.host,
+                port: formData.port,
+                siteRoot: formData.siteRoot,
+                username: formData.username,
+                // TODO keypath
             }
+            ephemeral.password = formData.password
             break
-        case "bluesky":
-            newSecrets = {
-                integrations: {
-                    bluesky: {
-                        handle: formData.handle, // TODO do we need this? will it break if changed?
-                        userId: await resolveBlueskyHandle(formData.handle),
-                        appPassword: formData.appPassword,
-                    },
-                },
-            }
+        case "other-password":
+            ephemeral.password = formData.password
             break
+        // TODO move this somewhere else
+        // case "bluesky":
+        //     newSecrets.integrations = {
+        //         bluesky: {
+        //             handle: formData.handle, // TODO do we need this? will it break if changed?
+        //             userId: await resolveBlueskyHandle(formData.handle),
+        //             appPassword: formData.appPassword,
+        //         },
+        //     }
+        //     break
         default:
             break
     }
 
     activeProject.updateSecrets(newSecrets)
 
-    if (newSecrets.deployment) {
-        // TODO oh god test this before shipping
-        await build() // .then?
+    // TODO oh god test this before shipping
+    await build() // .then?
 
-        // await setTimeout(1000) // HACK to get around build not finishing in time for deploy
+    // await setTimeout(1000) // HACK to get around build not finishing in time for deploy
 
-        try {
-            deploy()
-        } catch (err) {
-            logger.error(err)
-        }
+    try {
+        deploy(ephemeral)
+    } catch (err) {
+        logger.error(err)
     }
 }

@@ -68,7 +68,7 @@ export function compile(
         // logger.error(strings.generator.compileFail(pageMeta.template))
         logger.error(error.message)
         const encodedError = error.message.replace(
-            /[\u00A0-\u9999<>\&]/gim,
+            /[\u00A0-\u9999<>&]/gim,
             function (i) {
                 return "&#" + i.charCodeAt(0) + ";"
             },
@@ -77,7 +77,7 @@ export function compile(
     }
 }
 
-export function renderFormToHtml(formName, rendererPath) {
+export function renderFormToHtml(formName, rendererPath, data = {}) {
     const frontMatter = getFrontMatterFromFile(
         pathJoin(rendererPath, "forms", `${formName}.md`),
     )
@@ -86,6 +86,7 @@ export function renderFormToHtml(formName, rendererPath) {
         {
             ...frontMatter.attributes,
             _content: renderMdToHtml(frontMatter.body),
+            ...data,
         },
         pathJoin(rendererPath, `partials`),
         true,
