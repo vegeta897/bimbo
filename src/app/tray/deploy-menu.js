@@ -7,7 +7,7 @@ import { activeProject } from "../../index.js"
 import { APP_SETTINGS, openExternalUrl, showPrompt } from "../electron.js"
 import { deploy } from "../../deploy.js"
 
-export function getPlusModeItems() {
+export function getDeployMenuItems() {
     if (!IS_PLUS_MODE) {
         return [
             {

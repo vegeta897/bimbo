@@ -19,7 +19,7 @@ import { checkVersion, CURRENT_VERSION, versionIsCurrent } from "../version.js"
 import { clearConfig } from "../index.js"
 import { postToBugsplat } from "../bugsplat.js"
 import { getProjectsMenu } from "./projects-menu.js"
-import { getPlusModeItems } from "./plus-menu.js"
+import { getDeployMenuItems } from "./deploy-menu.js"
 import { getSettingsMenu } from "./settings-menu.js"
 
 let tray // instantiated in initializeTray() when app is ready
@@ -90,7 +90,7 @@ export function rebuildTray(showDebugMenu = false) {
             click: () => shell.openPath(activeProject.paths.ROOT),
         },
         { type: "separator" },
-        ...getPlusModeItems(),
+        ...getDeployMenuItems(),
         { type: "separator" },
         getSettingsMenu(),
         {
