@@ -4,6 +4,7 @@ electron.contextBridge.exposeInMainWorld("electron", {
     formSubmission: (data) => electron.ipcRenderer.send("form", data),
     onStartersList: (callback) =>
         // TODO change this to data sent to an hbs
+        // or, make it an invoke() to get the list instead of listening for it
         electron.ipcRenderer.on("starters-list", (_event, value) =>
             callback(value),
         ),
