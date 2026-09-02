@@ -28,7 +28,7 @@ export function getProjectsMenu() {
         { type: "separator" },
         {
             label: strings.menu.projects.create,
-            click: async function () {
+            click: async () => {
                 const browserWindow = await openPageInWindow("new-project")
                 // Send list of starters to form
                 browserWindow.webContents.send(

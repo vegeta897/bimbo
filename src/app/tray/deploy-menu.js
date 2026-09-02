@@ -1,4 +1,5 @@
-import { deployMethods, IS_PLUS_MODE } from "../../deploy.js"
+import { ipcMain } from "electron"
+import { deployMethods, IS_PLUS_MODE, testDeployConfig } from "../../deploy.js"
 import strings from "../../config/strings.js"
 import { renderFormInWindow, openPageInWindow } from "../window.js"
 import { Menu } from "electron"
@@ -61,7 +62,22 @@ export function getDeployMenuItems() {
                 deployMethods.map((method) => {
                     return {
                         label: method,
-                        click: () => renderFormInWindow(method),
+                        click: async () => {
+                            const browserWindow =
+                                await renderFormInWindow(method)
+                            ipcMain.handle(
+                                "check-deploy",
+                                async (event, deployConfig) => {
+                                    deployConfig.provider = deployConfig.id
+                                    const result =
+                                        await testDeployConfig(deployConfig)
+                                    return result
+                                },
+                            )
+                            browserWindow.on("closed", () =>
+                                ipcMain.removeHandler("check-deploy"),
+                            )
+                        },
                     }
                 }),
             ),

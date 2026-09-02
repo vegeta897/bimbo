@@ -130,6 +130,7 @@ async function handleDeployForm(formData) {
             }
             break
         case "neocities": {
+            // TODO support api key provided by user instead of user/pass
             const apiKey = await getNeocitiesApiKey(
                 formData.username,
                 formData.password,

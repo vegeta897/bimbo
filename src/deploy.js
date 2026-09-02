@@ -24,7 +24,7 @@ export async function deploy(ephemeral = {}) {
         ...ephemeral,
     }
 
-    let success = false
+    let result
     const startMsg = strings.deployment.start(deployConfig.provider)
     logger.info(startMsg)
     // TODO how to surface these to electron
@@ -33,19 +33,19 @@ export async function deploy(ephemeral = {}) {
 
     switch (deployConfig.provider) {
         case "nekoweb":
-            success = await deployToNekoweb(deployConfig)
+            result = await deployToNekoweb(deployConfig)
             break
         case "neocities":
-            success = await deployToNeocities(deployConfig)
+            result = await deployToNeocities(deployConfig)
             break
         case "other":
-            success = await deployViaSftp(deployConfig)
+            result = await deployViaSftp(deployConfig)
             break
         default:
             break
     }
 
-    let resultMsg = success
+    let resultMsg = result.success
         ? strings.deployment.finish.success()
         : strings.deployment.finish.fail
     logger.info(resultMsg)
@@ -61,7 +61,21 @@ export async function deploy(ephemeral = {}) {
     watch()
 }
 
+export async function testDeployConfig(deployConfig) {
+    switch (deployConfig.provider) {
+        case "nekoweb":
+            return await deployToNekoweb(deployConfig, true)
+        case "neocities":
+            return await deployToNeocities(deployConfig, true)
+        case "other":
+            return await deployViaSftp(deployConfig, true)
+    }
+}
+
 export async function getNeocitiesApiKey(username, password) {
+    // TODO this will fail on a fresh account that hasn't yet made any changes to their site
+    // actual error message: "stale account - make a change through the UI to sign in this way"
+    // i had to make a change to my site via their web UI to fix this
     const response = await NeocitiesAPIClient.getKey({
         siteName: username,
         ownerPassword: password,
@@ -78,25 +92,44 @@ export async function getNeocitiesApiKey(username, password) {
     }
 }
 
-async function deployToNeocities(deployConfig) {
-    // TODO no css?
+async function deployToNeocities(deployConfig, testOnly = false) {
+    const result = { success: false }
     try {
+        if (!deployConfig.apiKey) {
+            const apiKey = await getNeocitiesApiKey(
+                deployConfig.username,
+                deployConfig.password,
+            )
+            if (!apiKey) {
+                throw "invalid username or password"
+            }
+            deployConfig.apiKey = apiKey
+        }
         const client = new NeocitiesAPIClient(deployConfig.apiKey)
 
-        let result = await client.deploy({
-            directory: activeProject.paths.OUTPUT,
-            cleanup: true, // Delete orphaned files
-            includeUnsupportedFiles: false, // TODO - atproto-did unsupported, paid feature
-        })
-
-        return result.results[0].body.result == "success"
+        if (testOnly) {
+            const siteInfo = await client.info()
+            result.success = siteInfo.result === "success"
+        } else {
+            // TODO bug: static folder not being uploaded
+            // maybe only happens on first attempt?
+            const deployResult = await client.deploy({
+                directory: activeProject.paths.OUTPUT,
+                cleanup: true, // Delete orphaned files
+                includeUnsupportedFiles: false, // TODO - atproto-did unsupported, paid feature
+            })
+            logger.info(JSON.stringify(deployResult))
+            result.success = deployResult.results[0].body.result == "success"
+        }
     } catch (err) {
         logger.error(err)
-        return false
+        result.message = `${err}`
     }
+    return result
 }
 
-async function deployToNekoweb(deployConfig) {
+async function deployToNekoweb(deployConfig, testOnly) {
+    const result = { success: false }
     const nekoweb = new NekowebAPI({
         apiKey: deployConfig.apiKey,
         logging: (logType, logMessage) => logger.info(logMessage), // TODO use logType? https://github.com/indiefellas/nekoweb-api/blob/main/src/types.ts
@@ -107,9 +140,15 @@ async function deployToNekoweb(deployConfig) {
 
     try {
         await nekoweb.getSiteInfo(deployConfig.domain)
+        result.success = true
     } catch {
         logger.error(strings.deployment.nekowebSiteInfoFail)
+        result.message = strings.deployment.nekowebSiteInfoFail
     }
+    if (testOnly) {
+        return result
+    }
+    result.success = false
     try {
         await zip(sitePath, zipPath) // TODO can we get as buffer?
         const bigfile = await nekoweb.createBigFile()
@@ -125,11 +164,12 @@ async function deployToNekoweb(deployConfig) {
         // TODO atproto thing not uploading - need to do separately?
         // let atfile = fs.readFileSync(path.join(sitePath, '.well-known/atproto-did'))
         // await nekoweb.upload('/.well-known/atproto-did', atfile)
-
-        return response == "Imported"
+        result.success = response === "Imported"
     } catch (err) {
         logger.error(err)
+        result.message = `${err}`
     }
+    return result
     // try {
     // }
     // catch(err) {
@@ -138,8 +178,8 @@ async function deployToNekoweb(deployConfig) {
     // }
 }
 
-async function deployViaSftp(deployConfig) {
-    let result = false
+async function deployViaSftp(deployConfig, testOnly = false) {
+    const result = { success: false }
     const client = new SftpClient()
     const sitePath = activeProject.paths.OUTPUT
 
@@ -157,13 +197,18 @@ async function deployViaSftp(deployConfig) {
                 "utf-8",
             )
         await client.connect(connectConfig)
-        await client.rmdir(deployConfig.siteRoot, true).catch(() => {}) // Fail silently if dir doesn't exist
-        result = await client.uploadDir(sitePath, deployConfig.siteRoot)
+        if (testOnly) {
+            await client.list(".")
+        } else {
+            await client.rmdir(deployConfig.siteRoot, true).catch(() => {}) // Fail silently if dir doesn't exist
+            await client.uploadDir(sitePath, deployConfig.siteRoot)
+        }
+        result.success = true
     } catch (err) {
         logger.error(err.message)
+        result.message = err.message || `${err}`
     }
     client.end()
-
     return result
 }
 

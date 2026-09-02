@@ -30,6 +30,7 @@ fields:
     - {
           id: password,
           helpText: "password for your SFTP-enabled username (this will not be saved)",
+          type: "password",
       }
 ---
 

@@ -1,6 +1,5 @@
 import * as path from "node:path"
 import * as fs from "node:fs"
-import { rm } from "node:fs/promises"
 
 import _ from "lodash"
 import { parse as yamlParse } from "yaml"
@@ -47,7 +46,7 @@ export async function build(isPostDeploy = false) {
 
     // delete previous build
     if (fs.existsSync(PROJECT_PATHS.OUTPUT)) {
-        await rm(PROJECT_PATHS.OUTPUT, {
+        await fs.promises.rm(PROJECT_PATHS.OUTPUT, {
             recursive: true,
             force: true,
             maxRetries: 10, // sometimes files are temporarily locked
@@ -258,6 +257,7 @@ let lastProjectMeta
 
 // TODO move watch into main
 export async function watch(initialBuild = false) {
+    // TODO bug: one time, a .vite folder got stuck in _site ?
     if (watcher) {
         await watcher.close()
     }
