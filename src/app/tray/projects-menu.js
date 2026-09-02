@@ -31,6 +31,7 @@ export function getProjectsMenu() {
             click: async () => {
                 const browserWindow = await openPageInWindow("new-project")
                 // Send list of starters to form
+                // TODO use the data argument for this!
                 browserWindow.webContents.send(
                     "starters-list",
                     Object.keys(getProjectStarters()),
