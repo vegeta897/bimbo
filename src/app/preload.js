@@ -8,6 +8,6 @@ electron.contextBridge.exposeInMainWorld("electron", {
             callback(value),
         ),
     pickDirectory: () => electron.ipcRenderer.invoke("pick-directory"),
-    checkDeploy: (deployConfig) =>
-        electron.ipcRenderer.invoke("check-deploy", deployConfig),
+    verifyDeploy: (deployConfig) =>
+        electron.ipcRenderer.invoke("verify-deploy", deployConfig),
 })

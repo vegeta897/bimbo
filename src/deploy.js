@@ -61,7 +61,7 @@ export async function deploy(ephemeral = {}) {
     watch()
 }
 
-export async function testDeployConfig(deployConfig) {
+export async function verifyDeployConfig(deployConfig) {
     switch (deployConfig.provider) {
         case "nekoweb":
             return await deployToNekoweb(deployConfig, true)
@@ -92,7 +92,7 @@ export async function getNeocitiesApiKey(username, password) {
     }
 }
 
-async function deployToNeocities(deployConfig, testOnly = false) {
+async function deployToNeocities(deployConfig, verifyOnly = false) {
     const result = { success: false }
     try {
         if (!deployConfig.apiKey) {
@@ -107,7 +107,7 @@ async function deployToNeocities(deployConfig, testOnly = false) {
         }
         const client = new NeocitiesAPIClient(deployConfig.apiKey)
 
-        if (testOnly) {
+        if (verifyOnly) {
             const siteInfo = await client.info()
             result.success = siteInfo.result === "success"
         } else {
@@ -128,7 +128,7 @@ async function deployToNeocities(deployConfig, testOnly = false) {
     return result
 }
 
-async function deployToNekoweb(deployConfig, testOnly) {
+async function deployToNekoweb(deployConfig, verifyOnly = false) {
     const result = { success: false }
     const nekoweb = new NekowebAPI({
         apiKey: deployConfig.apiKey,
@@ -145,7 +145,7 @@ async function deployToNekoweb(deployConfig, testOnly) {
         logger.error(strings.deployment.nekowebSiteInfoFail)
         result.message = strings.deployment.nekowebSiteInfoFail
     }
-    if (testOnly) {
+    if (verifyOnly) {
         return result
     }
     result.success = false
@@ -178,7 +178,7 @@ async function deployToNekoweb(deployConfig, testOnly) {
     // }
 }
 
-async function deployViaSftp(deployConfig, testOnly = false) {
+async function deployViaSftp(deployConfig, verifyOnly = false) {
     const result = { success: false }
     const client = new SftpClient()
     const sitePath = activeProject.paths.OUTPUT
@@ -197,7 +197,7 @@ async function deployViaSftp(deployConfig, testOnly = false) {
                 "utf-8",
             )
         await client.connect(connectConfig)
-        if (testOnly) {
+        if (verifyOnly) {
             await client.list(".")
         } else {
             await client.rmdir(deployConfig.siteRoot, true).catch(() => {}) // Fail silently if dir doesn't exist
