@@ -11,7 +11,7 @@ const RENDERER_PATH = path.join(__dirname, "renderer")
 function createBrowserWindow() {
     const browserWindow = new BrowserWindow({
         useContentSize: true,
-        alwaysOnTop: true,
+        alwaysOnTop: true, // reconsider, this can hide electron popups and errors
         webPreferences: {
             preload: path.join(__dirname, "preload.js"),
         },

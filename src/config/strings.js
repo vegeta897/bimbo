@@ -104,6 +104,8 @@ export default {
             confirm: "do it",
             cancel: "nevermind",
         },
+        unsafeUrl: (url) =>
+            `woah, you tried to open a URL we don't recognize: ${url}`,
     },
     deployment: {
         auth: {

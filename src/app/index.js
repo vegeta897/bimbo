@@ -64,15 +64,15 @@ app.whenReady().then(() => {
 })
 
 // redirect navigation and new windows to user's browser instead
-app.on("web-contents-created", (event, contents) => {
+app.on("web-contents-created", (event, webContents) => {
     // prevents navigation within BrowserWindow
-    contents.on("will-navigate", (event, navigationUrl) => {
+    webContents.on("will-navigate", (event, navigationUrl) => {
         event.preventDefault()
-        openExternalUrl(navigationUrl)
+        openExternalUrl(navigationUrl, webContents)
     })
     // prevents new BrowserWindow opening
-    contents.setWindowOpenHandler(({ url }) => {
-        openExternalUrl(url)
+    webContents.setWindowOpenHandler(({ url }) => {
+        openExternalUrl(url, webContents)
         return { action: "deny" }
     })
 })

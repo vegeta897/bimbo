@@ -13,10 +13,21 @@ const urls = {
 
 export default urls
 
-export const trustedExternalURLs = [
+const trustedExternalURLs = [
     urls.localPreview,
     urls.itch,
     urls.tutorial,
     urls.discord,
     urls.supportMailto,
-]
+    "https://nekoweb.org/api",
+    "https://neocities.org",
+    "https://neocities.org/api",
+    "https://bsky.app/settings/app-passwords",
+].map((url) => new URL(url))
+
+// use URL objects to normalize comparison
+export function urlIsTrusted(url) {
+    return trustedExternalURLs.some(
+        (trusted) => trusted.toString() === new URL(url).toString(),
+    )
+}

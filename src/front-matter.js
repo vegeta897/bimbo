@@ -1,4 +1,5 @@
 import _ from "lodash"
+import path from "node:path"
 
 class FrontMatterKey {
     name
@@ -65,7 +66,7 @@ export const FRONT_MATTER_KEYS = {
         false,
         (v) => typeof v === Boolean,
     ],
-    url: ["", null, (v) => !!new URL(value)], // TODO
+    url: ["", null, (value) => !!new URL(value)], // TODO
     date: [
         "date values can be optionally validated - for example, if you set `format: YYYY-MM-DD`",
     ],

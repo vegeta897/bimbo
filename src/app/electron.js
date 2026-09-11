@@ -4,7 +4,7 @@ import { Conf } from "electron-conf/main"
 
 import config from "../config/index.js"
 import strings from "../config/strings.js"
-import { trustedExternalURLs } from "../config/urls.js"
+import { urlIsTrusted } from "../config/urls.js"
 
 export const APP_PATH = app.getAppPath()
 export const USER_DATA_PATH = app.getPath("userData")
@@ -12,11 +12,14 @@ export const LOG_PATH = path.join(app.getPath("userData"), config.LOG_FILENAME)
 
 export const APP_SETTINGS = new Conf({ defaults: config.APP_SETTINGS_DEFAULTS })
 
-export function openExternalUrl(url) {
-    if (trustedExternalURLs.includes(url)) {
+export function openExternalUrl(url, webContents) {
+    if (urlIsTrusted(url)) {
         shell.openExternal(url)
     } else {
         logger.warn(`tried to open non-trusted URL ${url}`)
+        if (webContents) {
+            webContents.send("alert", strings.popups.unsafeUrl(url))
+        }
     }
 }
 
