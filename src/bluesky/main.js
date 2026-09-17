@@ -1,17 +1,14 @@
-import { mkdir, writeFile } from "node:fs/promises"
-import { readFileSync } from "node:fs"
+import fs from "node:fs/promises"
 import { join } from "node:path"
-import _ from "lodash"
 import tiny from "tiny-json-http"
-import promiseAllProperties from "promise-all-properties"
 import { sendBlueskyPostWithEmbed } from "./utils.ts"
 
 import strings from "../config/strings.js"
 
-let queuedPosts = {}
+let queuedPosts = []
 
 export function arePostsQueued() {
-    return Object.keys(queuedPosts).length > 0
+    return queuedPosts.length > 0
 }
 
 export async function resolveHandle(handle) {
@@ -46,52 +43,57 @@ export async function setupDomainVerification(handle, outputPath) {
         did = await resolveHandle(handle)
 
         const WELL_KNOWN_PATH = join(outputPath, ".well-known")
+        await fs.mkdir(WELL_KNOWN_PATH)
+        await fs.writeFile(join(WELL_KNOWN_PATH, "atproto-did"), did)
 
-        mkdir(WELL_KNOWN_PATH).then(() => {
-            writeFile(join(WELL_KNOWN_PATH, "atproto-did"), did)
-
-            logger.info(
-                strings.generator.bsky.domainVerification.success(handle, did),
-            )
-        })
+        logger.info(
+            strings.generator.bsky.domainVerification.success(handle, did),
+        )
     } catch (err) {
         return err
     }
 }
 
-export function queuePost(pageData, siteUrl) {
+export function queuePost(pageData /*, siteUrl*/) {
     // TODO fix header
     // const headerImg = readFileSync('izzy.png')
     // console.log(projects.getActivePath(pageData.headerImageLocal))
     // const headerImg = readFileSync(projects.getActivePath(pageData.headerImageLocal))
 
     // TODO let ppl customize this
-    const postMeta = [
-        `new post: ${pageData.title}`,
-        new URL(pageData.url, pageData.site.url).href,
-        pageData.title,
-        pageData.description,
-        new Blob([]),
-    ]
+    const postMeta = {
+        path: pageData.path,
+        text: `new post: ${pageData.title}`,
+        url: new URL(pageData.url, pageData.site.url).href,
+        title: pageData.title,
+        description: pageData.description,
+        thumb: new Blob([]),
+    }
 
-    queuedPosts[pageData.path] = postMeta
+    queuedPosts.push(postMeta)
 }
 
 export async function submitQueuedPosts() {
-    let submittedPosts = {}
+    const skippedPosts = []
 
-    for (const key in queuedPosts) {
-        const post = queuedPosts[key]
+    const submittedPosts = await Promise.all(
+        queuedPosts.map(async (post) => {
+            const remoteUrlResolves = await resolveUrl(post.url)
+            if (!remoteUrlResolves) {
+                logger.error(strings.deployment.bskyPostSkipped)
+                skippedPosts.push(post)
+            } else {
+                return sendBlueskyPostWithEmbed(
+                    post.text,
+                    post.url,
+                    post.title,
+                    post.description,
+                    post.thumb,
+                )
+            }
+        }),
+    )
+    queuedPosts = skippedPosts // skipped posts go back in the queue
 
-        let doesRemoteUrlResolve = await resolveUrl(post[1])
-
-        if (!doesRemoteUrlResolve) {
-            logger.error(strings.deployment.bskyPostSkipped)
-            delete queuedPosts[key]
-        } else {
-            submittedPosts[key] = sendBlueskyPostWithEmbed(...post)
-        }
-    }
-
-    return promiseAllProperties(submittedPosts)
+    return submittedPosts
 }

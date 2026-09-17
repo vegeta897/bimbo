@@ -174,7 +174,7 @@ async function handleDeployForm(formData) {
             break
     }
 
-    activeProject.updateSecrets(newSecrets)
+    await activeProject.updateSecrets(newSecrets)
 
     // TODO oh god test this before shipping
     await build() // .then?
@@ -182,7 +182,7 @@ async function handleDeployForm(formData) {
     // await setTimeout(1000) // HACK to get around build not finishing in time for deploy
 
     try {
-        deploy(ephemeral)
+        await deploy(ephemeral)
     } catch (err) {
         logger.error(err)
     }

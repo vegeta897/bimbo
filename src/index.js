@@ -1,6 +1,6 @@
-import * as fs from "node:fs"
+import * as fs from "node:fs/promises"
+import { existsSync, readFileSync } from "node:fs"
 import * as path from "node:path"
-import _ from "lodash"
 import winston from "winston"
 import { parse as yamlParse, stringify as yamlStringify } from "yaml"
 
@@ -28,11 +28,12 @@ export const setActiveProject = function (project) {
     activeProject = project
 }
 
-export function getProjectStarters() {
+export async function getProjectStarters() {
     const projectStartersPaths = {}
-    fs.readdirSync(config.PROJECT_STARTERS_PATH, {
+    const starterDirs = await fs.readdir(config.PROJECT_STARTERS_PATH, {
         withFileTypes: true,
-    }).forEach((dirent) => {
+    })
+    starterDirs.forEach((dirent) => {
         if (dirent.isDirectory()) {
             projectStartersPaths[dirent.name] = path.join(
                 dirent.parentPath,
@@ -43,31 +44,36 @@ export function getProjectStarters() {
     return projectStartersPaths
 }
 
-export const createNewProject = function (destinationPath, starter) {
+export async function createNewProject(destinationPath, starter) {
     const starterPath = path.join(config.PROJECT_STARTERS_PATH, starter)
-    if (!fs.existsSync(starterPath)) {
+    if (!existsSync(starterPath)) {
         logger.error(`path not found for starter "${starter}"`)
         return
     }
-    fs.cpSync(starterPath, destinationPath, {
+    await fs.cp(starterPath, destinationPath, {
         recursive: true,
     })
 
-    _.each(config.EXTRA_INIT_FILES, (data) => {
-        const SUBPATH = path.dirname(data.filePath)
+    await Promise.all(
+        config.EXTRA_INIT_FILES.map(async (data) => {
+            const subpath = path.dirname(data.filePath)
 
-        if (data.json) {
-            data.text = JSON.stringify(data.json, null, true)
-        }
+            if (data.json) {
+                data.text = JSON.stringify(data.json, null, true)
+            }
 
-        if (SUBPATH) {
-            fs.mkdirSync(path.join(destinationPath, SUBPATH), {
-                recursive: true,
-            })
-        }
+            if (subpath) {
+                await fs.mkdir(path.join(destinationPath, subpath), {
+                    recursive: true,
+                })
+            }
 
-        fs.writeFileSync(path.join(destinationPath, data.filePath), data.text)
-    })
+            await fs.writeFile(
+                path.join(destinationPath, data.filePath),
+                data.text,
+            )
+        }),
+    )
 
     const NEW_PROJECT = new Project(destinationPath)
 
@@ -82,11 +88,16 @@ export class Project {
     paths
 
     constructor(rootPath) {
-        this.paths = _.mapValues(config.PROJECT_PATHS, (relativePath) =>
-            path.join(rootPath, relativePath),
+        this.paths = Object.fromEntries(
+            Object.entries(config.PROJECT_PATHS).map(
+                ([pathKey, relativePath]) => [
+                    pathKey,
+                    path.join(rootPath, relativePath),
+                ],
+            ),
         )
 
-        if (!fs.existsSync(this.paths.CONFIG_FILE)) {
+        if (!existsSync(this.paths.CONFIG_FILE)) {
             return Error(`${this.paths.CONFIG_FILE} does not exist`)
         }
     }
@@ -94,15 +105,15 @@ export class Project {
     get config() {
         return readConfigFile(this.paths.CONFIG_FILE)
     }
-    updateConfig(data) {
-        updateConfigFile(this.paths.CONFIG_FILE, data)
+    async updateConfig(data) {
+        await updateConfigFile(this.paths.CONFIG_FILE, data)
     }
 
     get secrets() {
         return readConfigFile(this.paths.SECRETS_FILE)
     }
-    updateSecrets(data) {
-        updateConfigFile(this.paths.SECRETS_FILE, data)
+    async updateSecrets(data) {
+        await updateConfigFile(this.paths.SECRETS_FILE, data)
     }
 
     get globals_meta() {
@@ -124,19 +135,19 @@ export class Project {
 }
 
 function readConfigFile(filepath) {
-    return fs.existsSync(filepath) ? parseYamlFile(filepath) : {}
+    return existsSync(filepath) ? parseYamlFile(filepath) : {}
 }
 
-export function updateConfigFile(filepath, newData = {}) {
-    let configData = fs.existsSync(filepath) ? parseYamlFile(filepath) : {}
+async function updateConfigFile(filepath, newData = {}) {
+    const configData = existsSync(filepath) ? parseYamlFile(filepath) : {}
 
-    fs.writeFileSync(filepath, yamlStringify(_.merge(configData, newData)))
+    await fs.writeFile(filepath, yamlStringify({ ...configData, ...newData }))
 
     const UPDATED_KEYS = Object.keys(newData)
     logger.info(strings.logMsg.userConfigSaved(filepath, UPDATED_KEYS))
     return UPDATED_KEYS
 }
 
-export function parseYamlFile(filepath) {
-    return yamlParse(fs.readFileSync(filepath, "utf-8"))
+function parseYamlFile(filepath) {
+    return yamlParse(readFileSync(filepath, "utf-8"))
 }

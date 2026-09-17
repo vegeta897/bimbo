@@ -1,5 +1,6 @@
 import * as path from "node:path"
-import * as fs from "node:fs"
+import * as fs from "node:fs/promises"
+import { existsSync } from "node:fs"
 
 import _ from "lodash"
 import { parse as yamlParse } from "yaml"
@@ -32,11 +33,11 @@ let buildData
 export async function build(isPostDeploy = false) {
     logger.info(strings.generator.buildStart(isPostDeploy))
 
-    const PROJECT_PATHS = activeProject.paths
+    const projectPaths = activeProject.paths
 
     // quit if content folder is missing
     // TODO probably other required folders to check for
-    if (!fs.existsSync(PROJECT_PATHS.CONTENT)) {
+    if (!existsSync(projectPaths.CONTENT)) {
         logger.info(strings.generator.missingContentFolder)
         // TODO showMessageBox() // return error (to app or main)
         return
@@ -45,180 +46,173 @@ export async function build(isPostDeploy = false) {
     buildData = { _pages: [], _data: {}, collections: {} }
 
     // delete previous build
-    if (fs.existsSync(PROJECT_PATHS.OUTPUT)) {
-        await fs.promises.rm(PROJECT_PATHS.OUTPUT, {
+    if (existsSync(projectPaths.OUTPUT)) {
+        await fs.rm(projectPaths.OUTPUT, {
             recursive: true,
             force: true,
             maxRetries: 10, // sometimes files are temporarily locked
         })
     }
-    fs.mkdirSync(PROJECT_PATHS.OUTPUT)
+    await fs.mkdir(projectPaths.OUTPUT)
 
-    if (fs.existsSync(PROJECT_PATHS.DATA)) {
+    if (existsSync(projectPaths.DATA)) {
         // TODO - find out why i'm using promise readdir sometimes
-        const dataFilepaths = await fs.promises.readdir(PROJECT_PATHS.DATA, {
+        const dataFilepaths = await fs.readdir(projectPaths.DATA, {
             recursive: true,
         })
 
-        _.each(dataFilepaths, (filepath) => {
-            const rawData = fs.readFileSync(
-                path.join(PROJECT_PATHS.DATA, filepath),
-                "utf-8",
-            )
-            const dataName = path.basename(filepath, path.extname(filepath))
+        await Promise.all(
+            dataFilepaths.map(async (filepath) => {
+                const rawData = await fs.readFile(
+                    path.join(projectPaths.DATA, filepath),
+                    "utf-8",
+                )
+                const dataName = path.basename(filepath, path.extname(filepath))
 
-            // TODO clean this up
-            try {
-                if (path.extname(filepath) == ".json") {
-                    buildData._data[dataName] = JSON.parse(rawData)
+                // TODO clean this up
+                try {
+                    if (path.extname(filepath) == ".json") {
+                        buildData._data[dataName] = JSON.parse(rawData)
+                    }
+                    if (path.extname(filepath) == ".yaml") {
+                        buildData._data[dataName] = yamlParse(rawData)
+                    }
+                    if (path.extname(filepath) == ".txt") {
+                        buildData._data[dataName] = rawData.split("\n")
+                    }
+                    // eslint-disable-next-line no-unused-vars
+                } catch (e) {
+                    logger.warn("failed to parse data from " + dataName) // TODO string
                 }
-                if (path.extname(filepath) == ".yaml") {
-                    buildData._data[dataName] = yamlParse(rawData)
-                }
-                if (path.extname(filepath) == ".txt") {
-                    buildData._data[dataName] = rawData.split("\n")
-                }
-                // eslint-disable-next-line no-unused-vars
-            } catch (e) {
-                logger.warn("failed to parse data from " + dataName) // TODO string
-            }
-        })
+            }),
+        )
     }
 
-    const CONTENT_FILEPATHS = await fs.promises.readdir(PROJECT_PATHS.CONTENT, {
+    const contentPaths = await fs.readdir(projectPaths.CONTENT, {
         recursive: true,
     })
-
-    _.chain(CONTENT_FILEPATHS)
-        .filter((item) => {
-            return path.extname(item) == config.CONTENT_EXTENSION
-        })
-        .each((mdFilepath) => {
-            const PAGE_META = getPageData(mdFilepath)
-
-            if (PAGE_META) {
-                buildData._pages.push(PAGE_META)
-            }
-        })
-        .value()
+    for (const contentPath of contentPaths) {
+        if (path.extname(contentPath) !== config.CONTENT_EXTENSION) {
+            continue
+        }
+        const pageMeta = await getPageData(contentPath)
+        if (pageMeta) {
+            buildData._pages.push(pageMeta)
+        }
+    }
 
     if (isPostDeploy && arePostsQueued()) {
         await processBlueskyPosts()
     }
 
-    _.each(activeProject.collections_meta, (ruleset) => {
-        const NAME = config.PAGE_GROUP_PREFIX + ruleset.name
-        const FILTERS = ruleset.filter
-        const SORTS = ruleset.sort
-        const GROUPS = ruleset.group
+    activeProject.collections_meta.forEach((ruleset) => {
+        const collectionName = config.PAGE_GROUP_PREFIX + ruleset.name
 
-        buildData.collections[NAME] = buildData._pages
-
-        _.each(FILTERS, (f) => {
-            const FILTER_KEY = f.key
-            const FILTER_VALUE = f.value
-
-            if (FILTER_VALUE) {
-                buildData.collections[NAME] = _.filter(
-                    buildData.collections[NAME],
-                    (v) => v[FILTER_KEY] == FILTER_VALUE,
-                )
-            } else {
-                buildData.collections[NAME] = _.filter(
-                    buildData.collections[NAME],
-                    (v) => v[FILTER_KEY],
-                )
-            }
+        buildData.collections[collectionName] = buildData._pages
+        ruleset.filter?.forEach((filter) => {
+            buildData.collections[collectionName] = buildData.collections[
+                collectionName
+            ].filter((page) =>
+                filter.value
+                    ? page[filter.key] === filter.value
+                    : page[filter.key],
+            )
         })
 
-        _.each(SORTS, (s) => {
-            buildData.collections[NAME] = _.sortBy(
-                buildData.collections[NAME],
-                (v) => v[s.key],
+        ruleset.sort?.forEach((sort) => {
+            buildData.collections[collectionName] = _.sortBy(
+                buildData.collections[collectionName],
+                (v) => v[sort.key],
             )
 
-            if (s.order == "descending") {
-                buildData.collections[NAME] = _.reverse(
-                    buildData.collections[NAME],
-                )
+            if (sort.order === "descending") {
+                buildData.collections[collectionName].reverse()
             }
         })
 
-        _.each(GROUPS, (g) => {
-            const GROUP_VALUES = _.chain(buildData.collections[NAME])
-                .flatMap((v) => v[g.key])
-                .compact()
-                .uniq()
-                .value()
+        ruleset.group?.forEach((group) => {
+            // TODO defining the values and then assigning pages to them can be done in one iteration
+            const groupValues = new Set(
+                buildData.collections[collectionName]
+                    .flatMap((collection) => collection[group.key])
+                    .filter((v) => v),
+            )
 
-            let pageGroups = {}
+            const pageGroups = {}
 
-            _.each(GROUP_VALUES, (v) => {
-                pageGroups[v] = _.filter(buildData.collections[NAME], (p) => {
-                    const PAGE_VALUE = p[g.key]
+            groupValues.forEach((groupValue) => {
+                pageGroups[groupValue] = buildData.collections[
+                    collectionName
+                ].filter((page) => {
+                    const pageValue = page[group.key]
 
-                    if (!PAGE_VALUE) {
+                    if (!pageValue) {
                         return
                     }
 
-                    if (Array.isArray(PAGE_VALUE)) {
-                        return PAGE_VALUE.includes(v)
+                    if (Array.isArray(pageValue)) {
+                        return pageValue.includes(groupValue)
                     } else {
-                        return PAGE_VALUE == v
+                        return pageValue === groupValue
                     }
                 })
             })
 
-            buildData.collections[NAME] = pageGroups
+            buildData.collections[collectionName] = pageGroups
         })
 
-        // TODO this doesn't work right for groups
-        _.each(buildData.collections[NAME], (v, i) => {
-            if (i - 1 > -1) {
-                buildData.collections[NAME][i]._nextPage = structuredClone(
-                    buildData.collections[NAME][i - 1],
-                )
+        // add references to prev/next page to all pages
+        // TODO only do this if collection is marked as a "series"
+        // it doesn't really have a purpose in navPages or grouped collections
+        let nextPage
+        let previousPage
+        Object.keys(buildData.collections[collectionName]).forEach((key) => {
+            // note, "next" and "previous" are reversed in the direction of this loop
+            if (nextPage) {
+                buildData.collections[collectionName][key]._nextPage = nextPage
             }
-            if (i + 1 < buildData.collections[NAME].length) {
-                buildData.collections[NAME][i]._previousPage = structuredClone(
-                    buildData.collections[NAME][i + 1],
-                )
+            nextPage = buildData.collections[collectionName][key]
+            if (previousPage) {
+                previousPage._previousPage =
+                    buildData.collections[collectionName][key]
             }
+            previousPage = buildData.collections[collectionName][key]
         })
     })
 
     // TODO do something with snippets idk
-    if (fs.existsSync(PROJECT_PATHS.SNIPPETS)) {
-        buildData._snippets = _.chain(fs.readdirSync(PROJECT_PATHS.SNIPPETS))
-            .map((filename) => {
-                const key = path.basename(filename, ".md")
-                const mdContent = fs.readFileSync(
-                    path.join(PROJECT_PATHS.SNIPPETS, filename),
-                    "utf-8",
-                )
-                return [key, renderMdToHtml(mdContent)]
-            })
-            .fromPairs()
-            .value()
+    if (existsSync(projectPaths.SNIPPETS)) {
+        const snippets = await fs.readdir(projectPaths.SNIPPETS)
+        buildData._snippets = Object.fromEntries(
+            await Promise.all(
+                snippets.map(async (snippetPath) => {
+                    const key = path.basename(snippetPath, ".md")
+                    const mdContent = await fs.readFile(
+                        path.join(projectPaths.SNIPPETS, snippetPath),
+                        "utf-8",
+                    )
+                    return [key, renderMdToHtml(mdContent)]
+                }),
+            ),
+        )
     }
 
-    _.each(buildData._pages, (pageMeta) => {
-        generatePage(pageMeta)
-    })
+    await Promise.all(
+        buildData._pages.map(async (pageMeta) => await generatePage(pageMeta)),
+    )
 
-    const RSS_GROUP_NAME = _.find(
-        activeProject.collections_meta,
+    const rssCollectionName = activeProject.collections_meta.find(
         (g) => g.rss,
     )?.name
 
-    if (RSS_GROUP_NAME) {
-        generateRssFeed(config.PAGE_GROUP_PREFIX + RSS_GROUP_NAME)
+    if (rssCollectionName) {
+        await generateRssFeed(config.PAGE_GROUP_PREFIX + rssCollectionName)
     }
 
     // copy static pages
-    fs.cp(
-        PROJECT_PATHS.STATIC,
-        path.join(PROJECT_PATHS.OUTPUT, config.PROJECT_PATHS.STATIC),
+    await fs.cp(
+        projectPaths.STATIC,
+        path.join(projectPaths.OUTPUT, config.PROJECT_PATHS.STATIC),
         { recursive: true },
         (err) => {
             if (err) {
@@ -233,9 +227,9 @@ export async function build(isPostDeploy = false) {
 
     if (bskyHandle) {
         // TODO never exists bc _site gets wiped every build
-        // if (!fs.existsSync(path.join(getJoinedPath(config.PROJECT_PATHS.OUTPUT), '.well-known/atproto-did'))) {
+        // if (!existsSync(path.join(getJoinedPath(config.PROJECT_PATHS.OUTPUT), '.well-known/atproto-did'))) {
         //     try {
-        //         setupDomainVerification(bskyHandle, getJoinedPath(config.PROJECT_PATHS.OUTPUT))
+        //         await setupDomainVerification(bskyHandle, getJoinedPath(config.PROJECT_PATHS.OUTPUT))
         //     } catch (err) {
         //         logger.warn(
         //             strings.generator.bsky.domainVerification.fail(bskyHandle),
@@ -326,49 +320,46 @@ export async function pauseWatcher() {
     }
 }
 
-function getPageData(contentFilepath) {
-    const PROJECT_PATHS = activeProject.paths
-    const ABSOLUTE_FILEPATH = path.join(PROJECT_PATHS.CONTENT, contentFilepath)
-    const FRONT_MATTER = getFrontMatterFromFile(ABSOLUTE_FILEPATH)
+async function getPageData(contentPath) {
+    const projectPaths = activeProject.paths
+    const absolutePath = path.join(projectPaths.CONTENT, contentPath)
+    const frontMatter = await getFrontMatterFromFile(absolutePath)
 
-    let pageMeta = {
-        _filepath: ABSOLUTE_FILEPATH,
-        _subfolder: path.dirname(contentFilepath),
+    const pageMeta = {
+        _filepath: absolutePath,
+        _subfolder: path.dirname(contentPath),
         _relativeUrl:
             "/" +
-            contentFilepath.replace(
+            contentPath.replace(
                 config.CONTENT_EXTENSION,
                 config.PAGE_EXTENSION,
             ),
-        _mdContent: FRONT_MATTER,
+        _mdContent: frontMatter,
         // _content added in generatePage()
     }
 
-    const CONTENT_DEFAULTS = _.omit(activeProject.defaults_meta, "subfolders")
-    const SUBFOLDER_DEFAULTS =
+    const contentDefaults = _.omit(activeProject.defaults_meta, "subfolders")
+    const subfolderDefaults =
         activeProject.defaults_meta?.subfolders[pageMeta._subfolder] || {}
 
     _.merge(
         pageMeta, // base object with generated values
-        CONTENT_DEFAULTS, // project-wide default values
-        SUBFOLDER_DEFAULTS, // subfolder-specific default values
-        FRONT_MATTER.attributes, // page-specific values
+        contentDefaults, // project-wide default values
+        subfolderDefaults, // subfolder-specific default values
+        frontMatter.attributes, // page-specific values
     )
 
-    pageMeta.readingTime = readingTime(FRONT_MATTER.body).text
+    pageMeta.readingTime = readingTime(frontMatter.body).text
 
     // TODO validators
     if (pageMeta.draft) {
-        logger.info(strings.generator.skipDraft(contentFilepath))
+        logger.info(strings.generator.skipDraft(contentPath))
         return
     }
 
     // use filename as title if not defined
     if (!pageMeta.title) {
-        pageMeta.title = path.basename(
-            contentFilepath,
-            config.CONTENT_EXTENSION,
-        )
+        pageMeta.title = path.basename(contentPath, config.CONTENT_EXTENSION)
     }
 
     if (pageMeta.redirect) {
@@ -401,8 +392,8 @@ function getPageData(contentFilepath) {
     return pageMeta
 }
 
-function generatePage(pageMeta) {
-    const PROJECT_PATHS = activeProject.paths
+async function generatePage(pageMeta) {
+    const projectPaths = activeProject.paths
 
     if (pageMeta.redirect) {
         return
@@ -413,36 +404,33 @@ function generatePage(pageMeta) {
     pageMeta._project_meta = activeProject.config // TODO _project_config?
     pageMeta._data = buildData._data // TODO not sure if this is best way to do this
     pageMeta._snippets = buildData._snippets // review all of this lol
-    _.assign(pageMeta, buildData.collections) // TODO not sure if still works?
+    Object.assign(pageMeta, buildData.collections) // TODO not sure if still works?
 
     if (!pageMeta.template) {
         pageMeta.template = path.basename(pageMeta._filepath, ".md") + ".hbs"
     }
 
-    const TEMPLATE_FILEPATH = path.join(
-        PROJECT_PATHS.TEMPLATES,
-        pageMeta.template,
-    )
+    const templatePath = path.join(projectPaths.TEMPLATES, pageMeta.template)
 
     // get html template
-    if (!fs.existsSync(TEMPLATE_FILEPATH)) {
+    if (!existsSync(templatePath)) {
         logger.warn(strings.generator.missingTemplate)
         return // TODO missing template handling (skip page?)
     }
 
-    const HTML_FILEPATH = pageMeta._relativeUrl
-    const OUTPUT_PATH = path.dirname(HTML_FILEPATH)
+    const htmlPath = pageMeta._relativeUrl
+    const outputPath = path.dirname(htmlPath)
 
-    if (!fs.existsSync(OUTPUT_PATH)) {
+    if (!existsSync(outputPath)) {
         // TODO catch potential permission errors
-        fs.mkdirSync(path.join(PROJECT_PATHS.OUTPUT, OUTPUT_PATH), {
+        await fs.mkdir(path.join(projectPaths.OUTPUT, outputPath), {
             recursive: true,
         })
     }
 
-    fs.writeFileSync(
-        path.join(PROJECT_PATHS.OUTPUT, HTML_FILEPATH),
-        compile(TEMPLATE_FILEPATH, pageMeta, PROJECT_PATHS.PARTIALS),
+    await fs.writeFile(
+        path.join(projectPaths.OUTPUT, htmlPath),
+        await compile(templatePath, pageMeta, projectPaths.PARTIALS),
     )
 
     // TODO auto post should be project-level setting
@@ -458,26 +446,19 @@ function generatePage(pageMeta) {
 async function processBlueskyPosts() {
     await pauseWatcher()
     const { userId } = activeProject.secrets.integrations.bluesky
-    const SKEETS_DATA = await submitQueuedPosts()
-
-    // let index = 0
+    const skeetsPosted = await submitQueuedPosts()
 
     // TODO test
-    _.each(SKEETS_DATA, ({ id }, filepath) => {
-        const PAGE_INDEX = _.findIndex(
-            buildData._pages,
-            (page) => page._filepath == filepath,
+    skeetsPosted.forEach(({ path, id }) => {
+        const pageMeta = buildData._pages.find(
+            (page) => (page._filepath = path),
         )
-        const PAGE_META = buildData._pages[PAGE_INDEX]
 
-        buildData._pages[PAGE_INDEX].bskyPostId = id
+        pageMeta.bskyPostId = id
 
-        fs.writeFileSync(
-            PAGE_META._filepath,
-            PAGE_META._mdContent.replace(
-                "bskyPostId: tbd",
-                `bskyPostId: ${id}`,
-            ),
+        fs.writeFile(
+            pageMeta._filepath,
+            pageMeta._mdContent.replace("bskyPostId: tbd", `bskyPostId: ${id}`), // TODO feels kinda hacky
         )
 
         logger.info(
@@ -485,12 +466,10 @@ async function processBlueskyPosts() {
                 `https://bsky.app/profile/${userId}/post/${id}`,
             ),
         )
-
-        // index++
     })
 }
 
-function generateRssFeed(groupName) {
+async function generateRssFeed(groupName) {
     const PROJECT_GLOBALS = activeProject.globals_meta
 
     const RSS_FEED = new Feed({
@@ -530,7 +509,7 @@ function generateRssFeed(groupName) {
         }
     })
 
-    fs.writeFileSync(
+    await fs.writeFile(
         path.join(activeProject.paths.OUTPUT, "feed.xml"),
         RSS_FEED.rss2(),
     )

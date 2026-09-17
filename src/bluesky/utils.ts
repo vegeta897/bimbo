@@ -1,7 +1,7 @@
 // source: https://kulpinski.dev/posts/embed-card-links-on-bluesky/
 
 import { AtpAgent, RichText } from "@atproto/api"
-// import projects from "../../index.js" // TODO
+import { activeProject } from "../index.js"
 
 type Metadata = {
     title: string
@@ -84,7 +84,8 @@ const getBlueskyAgent = async () => {
         service: "https://bsky.social",
     })
 
-    const creds = projects.active.getSecrets().integrations.bluesky
+    // @ts-expect-error - activeProject has no defined type yet
+    const creds = activeProject.getSecrets().integrations.bluesky
 
     await agent.login({
         identifier: creds.handle!,
@@ -139,6 +140,6 @@ export const sendBlueskyPostWithEmbed = async (
 
     return {
         id: postId,
-        handle: agent.sessionManager.session.handle,
+        handle: agent.sessionManager.session?.handle,
     }
 }

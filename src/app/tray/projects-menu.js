@@ -35,7 +35,7 @@ export function getProjectsMenu() {
                 // or have the page invoke a request for it
                 browserWindow.webContents.send(
                     "starters-list",
-                    Object.keys(getProjectStarters()),
+                    Object.keys(await getProjectStarters()),
                 )
                 ipcMain.handle("pick-directory", () =>
                     handlePickDirectory(browserWindow),

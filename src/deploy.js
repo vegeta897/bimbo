@@ -1,5 +1,5 @@
 import * as path from "node:path"
-import * as fs from "node:fs"
+import * as fs from "node:fs/promises"
 import { NeocitiesAPIClient } from "async-neocities"
 import NekowebAPI from "@indiefellas/nekoweb-api"
 import SftpClient from "ssh2-sftp-client"
@@ -152,14 +152,14 @@ async function deployToNekoweb(deployConfig, verifyOnly = false) {
     try {
         await zip(sitePath, zipPath) // TODO can we get as buffer?
         const bigfile = await nekoweb.createBigFile()
-        const zipFile = fs.readFileSync(zipPath)
+        const zipFile = await fs.readFile(zipPath)
         await bigfile.append(zipFile)
         // Delete and recreate domain root to clean up old files
         await nekoweb.delete("/" + deployConfig.domain)
         await nekoweb.create("/" + deployConfig.domain, true)
         const response = await bigfile.import("/" + deployConfig.domain)
 
-        fs.rmSync(zipPath)
+        await fs.rm(zipPath)
 
         // TODO atproto thing not uploading - need to do separately?
         // let atfile = fs.readFileSync(path.join(sitePath, '.well-known/atproto-did'))

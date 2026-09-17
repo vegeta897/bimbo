@@ -24,7 +24,7 @@ function createBrowserWindow() {
 
 export async function renderFormInWindow(formName, data = {}) {
     const browserWindow = createBrowserWindow()
-    const html = renderFormToHtml(formName, RENDERER_PATH, data)
+    const html = await renderFormToHtml(formName, RENDERER_PATH, data)
     await browserWindow.loadURL(
         "data:text/html;charset=UTF-8," + encodeURIComponent(html),
         {

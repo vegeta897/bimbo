@@ -1,4 +1,5 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs"
+import fs from "node:fs/promises"
 import { join as pathJoin } from "node:path"
 
 import Handlebars from "handlebars"
@@ -20,8 +21,8 @@ const MD = markdownit({
     .use(attrs)
     .use(imgSize)
 
-export function getFrontMatterFromFile(filepath) {
-    return fm(readFileSync(filepath, "utf-8"))
+export async function getFrontMatterFromFile(filepath) {
+    return fm(await fs.readFile(filepath, "utf-8"))
 }
 
 export function renderMdToHtml(mdBody) {
@@ -46,7 +47,7 @@ export function getHandlebarsPartialsFromPath(path) {
     return partials
 }
 
-export function compile(
+export async function compile(
     templateFilepath,
     data,
     partialsPath,
@@ -57,7 +58,7 @@ export function compile(
 
     try {
         const template = Handlebars.compile(
-            readFileSync(templateFilepath, "utf-8"),
+            await fs.readFile(templateFilepath, "utf-8"),
         )
         return template(data, {
             helpers: handlebarsHelpers,
@@ -77,11 +78,11 @@ export function compile(
     }
 }
 
-export function renderFormToHtml(formName, rendererPath, data = {}) {
-    const frontMatter = getFrontMatterFromFile(
+export async function renderFormToHtml(formName, rendererPath, data = {}) {
+    const frontMatter = await getFrontMatterFromFile(
         pathJoin(rendererPath, "forms", `${formName}.md`),
     )
-    const html = compile(
+    const html = await compile(
         pathJoin(rendererPath, "forms", "base.hbs"),
         {
             ...frontMatter.attributes,
