@@ -1,6 +1,7 @@
 import * as fs from "node:fs/promises"
 import { existsSync, readFileSync } from "node:fs"
 import * as path from "node:path"
+import _ from "lodash"
 import winston from "winston"
 import { parse as yamlParse, stringify as yamlStringify } from "yaml"
 
@@ -77,7 +78,7 @@ export async function createNewProject(destinationPath, starter) {
 
     const NEW_PROJECT = new Project(destinationPath)
 
-    NEW_PROJECT.updateConfig({
+    await NEW_PROJECT.updateConfig({
         globals: {
             title: path.basename(destinationPath),
         },
@@ -140,8 +141,7 @@ function readConfigFile(filepath) {
 
 async function updateConfigFile(filepath, newData = {}) {
     const configData = existsSync(filepath) ? parseYamlFile(filepath) : {}
-
-    await fs.writeFile(filepath, yamlStringify({ ...configData, ...newData }))
+    await fs.writeFile(filepath, yamlStringify(_.merge(configData, newData)))
 
     const UPDATED_KEYS = Object.keys(newData)
     logger.info(strings.logMsg.userConfigSaved(filepath, UPDATED_KEYS))

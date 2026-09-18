@@ -63,20 +63,6 @@ app.whenReady().then(() => {
     logger.info(strings.logMsg.ready)
 })
 
-// redirect navigation and new windows to user's browser instead
-app.on("web-contents-created", (event, webContents) => {
-    // prevents navigation within BrowserWindow
-    webContents.on("will-navigate", (event, navigationUrl) => {
-        event.preventDefault()
-        openExternalUrl(navigationUrl, webContents)
-    })
-    // prevents new BrowserWindow opening
-    webContents.setWindowOpenHandler(({ url }) => {
-        openExternalUrl(url, webContents)
-        return { action: "deny" }
-    })
-})
-
 export function clearConfig() {
     logger.info(strings.logMsg.configClearTry)
     APP_SETTINGS.clear()
@@ -105,12 +91,12 @@ ipcMain.on("form", async function (event, formData) {
     }
 })
 
-function handleNewProjectForm(formData) {
+async function handleNewProjectForm(formData) {
     // TODO validate project title as valid folder name
     const destinationPath = path.join(formData.projectRoot, formData.title)
 
     // TODO throw error if fails
-    createNewProject(destinationPath, formData.starter)
+    await createNewProject(destinationPath, formData.starter)
 
     projects.activeIndex = projects.add(destinationPath)
 

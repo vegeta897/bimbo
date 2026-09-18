@@ -2,6 +2,7 @@ import * as path from "node:path"
 import { fileURLToPath } from "url"
 import { app, BrowserWindow } from "electron"
 import { renderFormToHtml } from "../templater.js"
+import { openExternalUrl } from "./electron.js"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -41,3 +42,17 @@ export async function openPageInWindow(pageName) {
     )
     return browserWindow
 }
+
+// redirect navigation and new windows to user's browser instead
+app.on("web-contents-created", (event, webContents) => {
+    // prevents navigation within BrowserWindow
+    webContents.on("will-navigate", (event, navigationUrl) => {
+        event.preventDefault()
+        openExternalUrl(navigationUrl, webContents)
+    })
+    // prevents new BrowserWindow opening
+    webContents.setWindowOpenHandler(({ url }) => {
+        openExternalUrl(url, webContents)
+        return { action: "deny" }
+    })
+})
