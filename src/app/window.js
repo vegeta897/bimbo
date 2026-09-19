@@ -35,6 +35,7 @@ export async function renderFormInWindow(formName, data = {}) {
     return browserWindow
 }
 
+// TODO don't allow opening multiple deploy or new-project windows
 export async function openPageInWindow(pageName) {
     const browserWindow = createBrowserWindow()
     await browserWindow.loadFile(
