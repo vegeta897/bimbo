@@ -1,6 +1,5 @@
 import fs from "node:fs/promises"
 import { join } from "node:path"
-import tiny from "tiny-json-http"
 import { sendBlueskyPostWithEmbed } from "./utils.ts"
 
 import strings from "../config/strings.js"
@@ -12,7 +11,8 @@ export function arePostsQueued() {
 }
 
 export async function resolveHandle(handle) {
-    let result = await tiny.get({
+    const tiny = (await import("tiny-json-http")).default
+    const result = await tiny.get({
         url: `https://bsky.social/xrpc/com.atproto.identity.resolveHandle?handle=${handle}`,
     })
 
@@ -25,6 +25,7 @@ export async function resolveHandle(handle) {
 
 async function resolveUrl(url) {
     try {
+        const tiny = (await import("tiny-json-http")).default
         await tiny.get({ url: url })
     } catch (err) {
         logger.error(strings.deployment.urlCheck.fail(url))

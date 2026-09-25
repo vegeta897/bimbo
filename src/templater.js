@@ -2,30 +2,29 @@ import { readFileSync, readdirSync, existsSync } from "node:fs"
 import fs from "node:fs/promises"
 import { join as pathJoin } from "node:path"
 
-import Handlebars from "handlebars"
-import fm from "front-matter"
-import markdownit from "markdown-it"
-import markdownItFootnote from "markdown-it-footnote"
-import markdownItHighlightjs from "markdown-it-highlightjs"
 import { attrs } from "@mdit/plugin-attrs"
 import { imgSize } from "@mdit/plugin-img-size"
 
 import electronHelpers from "./handlebars/electron-helpers.js"
 import siteHelpers from "./handlebars/site-helpers.js"
 
-const MD = markdownit({
-    html: true,
-})
-    .use(markdownItFootnote)
-    .use(markdownItHighlightjs)
-    .use(attrs)
-    .use(imgSize)
-
 export async function getFrontMatterFromFile(filepath) {
+    const fm = (await import("front-matter")).default
     return fm(await fs.readFile(filepath, "utf-8"))
 }
 
-export function renderMdToHtml(mdBody) {
+export async function renderMdToHtml(mdBody) {
+    const markdownit = (await import("markdown-it")).default
+    const markdownItFootnote = (await import("markdown-it-footnote")).default
+    const markdownItHighlightjs = (await import("markdown-it-highlightjs"))
+        .default
+    const MD = markdownit({
+        html: true,
+    })
+        .use(markdownItFootnote)
+        .use(markdownItHighlightjs)
+        .use(attrs)
+        .use(imgSize)
     return MD.render(mdBody)
 }
 
@@ -57,6 +56,7 @@ export async function compile(
     const handlebarsPartials = getHandlebarsPartialsFromPath(partialsPath)
 
     try {
+        const Handlebars = (await import("handlebars")).default
         const template = Handlebars.compile(
             await fs.readFile(templateFilepath, "utf-8"),
         )
@@ -86,7 +86,7 @@ export async function renderFormToHtml(formName, rendererPath, data = {}) {
         pathJoin(rendererPath, "forms", "base.hbs"),
         {
             ...frontMatter.attributes,
-            _content: renderMdToHtml(frontMatter.body),
+            _content: await renderMdToHtml(frontMatter.body),
             ...data,
         },
         pathJoin(rendererPath, `partials`),

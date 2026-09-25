@@ -1,9 +1,5 @@
 import * as path from "node:path"
 import * as fs from "node:fs/promises"
-import { NeocitiesAPIClient } from "async-neocities"
-import NekowebAPI from "@indiefellas/nekoweb-api"
-import SftpClient from "ssh2-sftp-client"
-import { zip } from "zip-a-folder"
 import strings from "./config/strings.js"
 // import { arePostsQueued } from "./bluesky/main.js"
 import { pauseWatcher, watch } from "./site-generator.js"
@@ -76,6 +72,7 @@ export async function getNeocitiesApiKey(username, password) {
     // TODO this will fail on a fresh account that hasn't yet made any changes to their site
     // actual error message: "stale account - make a change through the UI to sign in this way"
     // i had to make a change to my site via their web UI to fix this
+    const { NeocitiesAPIClient } = await import("async-neocities")
     const response = await NeocitiesAPIClient.getKey({
         siteName: username,
         ownerPassword: password,
@@ -105,6 +102,7 @@ async function deployToNeocities(deployConfig, verifyOnly = false) {
             }
             deployConfig.apiKey = apiKey
         }
+        const { NeocitiesAPIClient } = await import("async-neocities")
         const client = new NeocitiesAPIClient(deployConfig.apiKey)
 
         if (verifyOnly) {
@@ -130,6 +128,7 @@ async function deployToNeocities(deployConfig, verifyOnly = false) {
 
 async function deployToNekoweb(deployConfig, verifyOnly = false) {
     const result = { success: false }
+    const NekowebAPI = (await import("@indiefellas/nekoweb-api")).default
     const nekoweb = new NekowebAPI({
         apiKey: deployConfig.apiKey,
         logging: (logType, logMessage) => logger.info(logMessage), // TODO use logType? https://github.com/indiefellas/nekoweb-api/blob/main/src/types.ts
@@ -150,6 +149,7 @@ async function deployToNekoweb(deployConfig, verifyOnly = false) {
     }
     result.success = false
     try {
+        const { zip } = await import("zip-a-folder")
         await zip(sitePath, zipPath) // TODO can we get as buffer?
         const bigfile = await nekoweb.createBigFile()
         const zipFile = await fs.readFile(zipPath)
@@ -180,6 +180,7 @@ async function deployToNekoweb(deployConfig, verifyOnly = false) {
 
 async function deployViaSftp(deployConfig, verifyOnly = false) {
     const result = { success: false }
+    const SftpClient = (await import("ssh2-sftp-client")).default
     const client = new SftpClient()
     const sitePath = activeProject.paths.OUTPUT
 

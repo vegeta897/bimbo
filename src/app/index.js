@@ -2,7 +2,7 @@ import * as path from "node:path"
 import { platform } from "node:os"
 
 import winston from "winston"
-import { app, globalShortcut, ipcMain } from "electron"
+import { app, globalShortcut, ipcMain, Menu } from "electron"
 
 import {
     APP_SETTINGS,
@@ -27,6 +27,8 @@ import {
 import { configureCrashReporting } from "./bugsplat.js"
 
 configureCrashReporting()
+
+Menu.setApplicationMenu(null) // prevent electron's default menu
 
 app.whenReady().then(() => {
     logger.add(

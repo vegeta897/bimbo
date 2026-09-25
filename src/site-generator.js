@@ -5,12 +5,9 @@ import { existsSync } from "node:fs"
 import _ from "lodash"
 import { parse as yamlParse } from "yaml"
 // import moment from "moment"
-import { Feed } from "feed"
 // import * as cheerio from "cheerio"
 // import * as feather from "feather-icons"
-import { createServer } from "vite"
 import chokidar from "chokidar"
-import { readingTime } from "reading-time-estimator"
 
 import { activeProject } from "./index.js"
 import config from "./config/index.js"
@@ -191,7 +188,7 @@ export async function build(isPostDeploy = false) {
                         path.join(projectPaths.SNIPPETS, snippetPath),
                         "utf-8",
                     )
-                    return [key, renderMdToHtml(mdContent)]
+                    return [key, await renderMdToHtml(mdContent)]
                 }),
             ),
         )
@@ -293,6 +290,7 @@ export async function watch(initialBuild = false) {
 
         logger.info(strings.generator.monitoring(PROJECT_PATHS.ROOT))
 
+        const { createServer } = await import("vite")
         server = await createServer({
             configFile: false,
             root: activeProject.paths.OUTPUT,
@@ -349,6 +347,7 @@ async function getPageData(contentPath) {
         frontMatter.attributes, // page-specific values
     )
 
+    const { readingTime } = await import("reading-time-estimator")
     pageMeta.readingTime = readingTime(frontMatter.body).text
 
     // TODO validators
@@ -400,7 +399,7 @@ async function generatePage(pageMeta) {
     }
 
     pageMeta.globals = activeProject.globals_meta
-    pageMeta._content = renderMdToHtml(pageMeta._mdContent.body)
+    pageMeta._content = await renderMdToHtml(pageMeta._mdContent.body)
     pageMeta._project_meta = activeProject.config // TODO _project_config?
     pageMeta._data = buildData._data // TODO not sure if this is best way to do this
     pageMeta._snippets = buildData._snippets // review all of this lol
@@ -470,25 +469,26 @@ async function processBlueskyPosts() {
 }
 
 async function generateRssFeed(groupName) {
-    const PROJECT_GLOBALS = activeProject.globals_meta
+    const projectGlobals = activeProject.globals_meta
 
-    const RSS_FEED = new Feed({
-        title: PROJECT_GLOBALS.title,
-        description: PROJECT_GLOBALS.description,
-        id: PROJECT_GLOBALS.url, // TODO dynamic url get?
-        link: PROJECT_GLOBALS.url, // TODO dynamic url get?
+    const { Feed } = await import("feed")
+    const rssFeed = new Feed({
+        title: projectGlobals.title,
+        description: projectGlobals.description,
+        id: projectGlobals.url, // TODO dynamic url get?
+        link: projectGlobals.url, // TODO dynamic url get?
         author: {
             // TODO support for multiple authors
-            name: PROJECT_GLOBALS.author.name,
-            email: PROJECT_GLOBALS.author.email,
-            link: PROJECT_GLOBALS.author.url,
+            name: projectGlobals.author.name,
+            email: projectGlobals.author.email,
+            link: projectGlobals.author.url,
         },
     })
 
     _.each(buildData.collections[groupName], (pageMeta) => {
         if (!pageMeta.excludeFromRss) {
             try {
-                RSS_FEED.addItem({
+                rssFeed.addItem({
                     title: pageMeta.title,
                     description: pageMeta.description,
                     id: pageMeta._relativeUrl,
@@ -497,9 +497,9 @@ async function generateRssFeed(groupName) {
                     content: pageMeta._content,
                     author: {
                         // TODO support for multiple authors
-                        name: PROJECT_GLOBALS.author.name,
-                        email: PROJECT_GLOBALS.author.email,
-                        link: PROJECT_GLOBALS.author.url,
+                        name: projectGlobals.author.name,
+                        email: projectGlobals.author.email,
+                        link: projectGlobals.author.url,
                     },
                 })
             } catch (err) {
@@ -511,6 +511,6 @@ async function generateRssFeed(groupName) {
 
     await fs.writeFile(
         path.join(activeProject.paths.OUTPUT, "feed.xml"),
-        RSS_FEED.rss2(),
+        rssFeed.rss2(),
     )
 }

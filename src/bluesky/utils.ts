@@ -1,6 +1,6 @@
 // source: https://kulpinski.dev/posts/embed-card-links-on-bluesky/
 
-import { AtpAgent, RichText } from "@atproto/api"
+import type { AtpAgent } from "@atproto/api"
 import { activeProject } from "../index.js"
 
 type Metadata = {
@@ -80,6 +80,7 @@ const createBlueskyEmbedCard = async (
  * @returns The Bluesky agent
  */
 const getBlueskyAgent = async () => {
+    const { AtpAgent } = await import("@atproto/api")
     const agent = new AtpAgent({
         service: "https://bsky.social",
     })
@@ -102,6 +103,7 @@ const getBlueskyAgent = async () => {
  */
 export const sendBlueskyPost = async (text: string, url?: string) => {
     const agent = await getBlueskyAgent()
+    const { RichText } = await import("@atproto/api")
     const rt = new RichText({ text })
     await rt.detectFacets(agent)
 
@@ -120,6 +122,7 @@ export const sendBlueskyPostWithEmbed = async (
     thumb: Blob,
 ) => {
     const agent = await getBlueskyAgent()
+    const { RichText } = await import("@atproto/api")
     const rt = new RichText({ text })
     await rt.detectFacets(agent)
 

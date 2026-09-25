@@ -1,4 +1,3 @@
-import tiny from "tiny-json-http"
 import { compareVersions } from "compare-versions"
 import { showNotification } from "./electron.js"
 import config from "../config/index.js"
@@ -30,6 +29,7 @@ export async function getLatestVersion() {
         latestVersion = "99.99.99-dev"
     } else {
         try {
+            const tiny = (await import("tiny-json-http")).default
             const packageJson = await tiny.get({ url: urls.githubPackage })
             latestVersion = JSON.parse(packageJson.body).version
         } catch (e) {
