@@ -83,8 +83,8 @@ export default {
         disableCrashReporting: {
             title: "disable crash reporting",
             message:
-                `hi! jsyk ${config.APP_NAME} only sends data relevant to crashes and the contents of your ${config.APP_NAME}.log file.` +
-                `it's super helpful for improving ${config.APP_NAME} and doesn't contain anything sensitive or identifying.` +
+                `hi! jsyk ${config.APP_NAME} only sends data relevant to crashes and the contents of your ${config.APP_NAME}.log file. ` +
+                `it's super helpful for improving ${config.APP_NAME} and doesn't contain anything sensitive or identifying. ` +
                 `you're welcome to disable it, but i'd really appreciate it if you kept it on. thanks!`,
             confirm: "nah disable please",
             cancel: "oh alright leave it on",
