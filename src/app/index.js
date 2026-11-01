@@ -155,6 +155,7 @@ async function handleDeployForm(formData) {
         //             handle: formData.handle, // TODO do we need this? will it break if changed?
         //             userId: await resolveBlueskyHandle(formData.handle),
         //             appPassword: formData.appPassword,
+        //             // TODO check that password matches expected "xxxx-xxxx-xxxx-xxxx" format for app passwords
         //         },
         //     }
         //     break
