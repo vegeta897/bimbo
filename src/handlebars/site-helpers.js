@@ -9,7 +9,7 @@ export default {
         return moment(date).utc().format(format)
     },
     getIcon: function (name, options) {
-        let icon = feather.icons[name]
+        const icon = feather.icons[name] || feather.icons.x // fallback to x
         icon.attrs = { ...icon.attrs, ...options.hash }
         return icon.toSvg()
     },
