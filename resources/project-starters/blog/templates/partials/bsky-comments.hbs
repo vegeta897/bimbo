@@ -15,22 +15,6 @@
 </style>
 <div id="social-section"></div>
 <script>
-    function httpGetAsJsonAsync(url, callback) {
-        var xmlHttp = new XMLHttpRequest()
-        xmlHttp.onreadystatechange = function () {
-            if (xmlHttp.readyState == 4 && xmlHttp.status == 200) {
-                var responseJson = JSON.parse(xmlHttp.responseText)
-                if (typeof responseJson == "undefined") {
-                    return
-                }
-                console.log(responseJson)
-                callback(responseJson)
-            }
-        }
-        xmlHttp.open("GET", url, true)
-        xmlHttp.send(null)
-    }
-
     function getPostLinkFromUri(uri) {
         return `https://bsky.app/profile/${uri.replace("at://", "").replace("/app.bsky.feed.post/", "/post/")}`
     }
@@ -39,103 +23,104 @@
         return `https://cdn.bsky.app/img/${useThumbnail ? "feed_thumbnail" : "feed_fullsize"}/plain/${did}/${blobLink}`
     }
 
-    function createHtmlTextForRecord(record) {
-        var htmlText = `<span>`
+    function sanitizeText(text) {
+        const spanElement = document.createElement("span")
+        spanElement.innerText = text
+        return spanElement.innerHTML
+    }
+
+    function createHtmlForRecord(record) {
+        const element = document.createElement("p")
 
         const textEncoder = new TextEncoder()
         const utf8Decoder = new TextDecoder()
         const utf8Text = new Uint8Array(record.text.length * 3)
         textEncoder.encodeInto(record.text, utf8Text)
-
-        var charIdx = 0
-        for (const facetIdx in record.facets) {
-            const facet = record.facets[facetIdx]
+        let charIdx = 0
+        for (const facet of record.facets || []) {
             const facetFeature = facet.features[0]
             const facetType = facetFeature.$type
 
-            var facetLink = "#"
-            if (facetType == "app.bsky.richtext.facet#tag") {
+            let facetLink = "#"
+            if (facetType === "app.bsky.richtext.facet#tag") {
                 facetLink = `https://bsky.app/hashtag/${facetFeature.tag}`
-            } else if (facetType == "app.bsky.richtext.facet#link") {
+            } else if (facetType === "app.bsky.richtext.facet#link") {
                 facetLink = facetFeature.uri
-            } else if (facetType == "app.bsky.richtext.facet#mention") {
+            } else if (facetType === "app.bsky.richtext.facet#mention") {
                 facetLink = `https://bsky.app/profile/${facetFeature.did}`
             }
 
             if (charIdx < facet.index.byteStart) {
                 const preFacetText = utf8Text.slice(charIdx, facet.index.byteStart)
-                htmlText += utf8Decoder.decode(preFacetText)
+                element.innerHTML += sanitizeText(utf8Decoder.decode(preFacetText))
             }
 
             const facetText = utf8Text.slice(facet.index.byteStart, facet.index.byteEnd)
-            htmlText += `<a href="${facetLink}" target="_blank">` + utf8Decoder.decode(facetText) + "</a>"
+            element.innerHTML += `<a href="${facetLink}" target="_blank">${sanitizeText(utf8Decoder.decode(facetText))}</a>`
 
             charIdx = facet.index.byteEnd
         }
 
         if (charIdx < utf8Text.length) {
             const postFacetText = utf8Text.slice(charIdx, utf8Text.length)
-            htmlText += utf8Decoder.decode(postFacetText)
+            element.innerHTML += sanitizeText(utf8Decoder.decode(postFacetText))
         }
-
-        return htmlText + "</span>"
+        return element.innerHTML
     }
 
     function createHtmlForReplies(replies) {
-        var htmlText = ""
-        for (const replyIdx in replies) {
-            const reply = replies[replyIdx]
+        let htmlText = ""
+        for (const reply of replies) {
             const replyPost = reply.post
             const postLink = getPostLinkFromUri(replyPost.uri)
-            const postText = createHtmlTextForRecord(replyPost.record)
+            const postHtml = createHtmlForRecord(replyPost.record)
 
-            var embedHtml = ""
+            let embedHtml = ""
             if (replyPost.embed) {
+                embedHtml += "<p>"
                 if (replyPost.embed.$type == "app.bsky.embed.external#view") {
                     const postEmbedExternal = replyPost.embed.external
                     if (postEmbedExternal.uri.includes(".gif?")) {
-                        embedHtml += `<img src="${postEmbedExternal.uri}" title="${postEmbedExternal.title}" alt="${postEmbedExternal.description}" style="height: 100px;">`
+                        embedHtml += `<img src="${postEmbedExternal.uri}" title="${sanitizeText(postEmbedExternal.title)}" alt="${sanitizeText(postEmbedExternal.description)}" style="height: 100px;">`
                     }
                 } else if (replyPost.embed.$type == "app.bsky.embed.images#view") {
-                    const images = replyPost.record.embed.images
-                    for (const imageIdx in images) {
-                        const image = images[imageIdx]
+                    for (const image of replyPost.record.embed.images) {
                         const thumbnailLink = getImageLinkFromBlob(replyPost.author.did, image.image.ref.$link, true)
                         const fullSizelLink = getImageLinkFromBlob(replyPost.author.did, image.image.ref.$link, false)
-                        embedHtml += `<a href="${fullSizelLink}" target="_blank"><img src="${thumbnailLink}" alt="${image.alt}" style="height: 100px;"></a>`
+                        embedHtml += `<a href="${fullSizelLink}" target="_blank"><img src="${thumbnailLink}" alt="${sanitizeText(image.alt)}" style="height: 100px;"></a>`
                     }
                 }
+                embedHtml += "</p>"
             }
-
             htmlText += `
-    <div style="margin-left:20px;">
-        <p>
-            <img src="${replyPost.author.avatar}" style="height:20px;width:20px;">
-            ${replyPost.author.displayName}
-            <a href="https://bsky.app/profile/${replyPost.author.did}">@${replyPost.author.handle}</a>
-        </p>
-        <p>${postText}</p>
-        ${embedHtml}
-        <p>
-            <a href="${postLink}">${replyPost.replyCount} replies</a>
-            <a href="${postLink}">${replyPost.repostCount + replyPost.quoteCount} reposts</a>
-            <a href="${postLink}">${replyPost.likeCount} likes</a></p>
-        <div>${createHtmlForReplies(reply.replies)}</div>
-    </div>`
+<div style="margin-left:20px;">
+    <p>
+        <img src="${replyPost.author.avatar}" style="height:20px;width:20px;">
+        ${sanitizeText(replyPost.author.displayName)}
+        <a href="https://bsky.app/profile/${replyPost.author.did}">@${sanitizeText(replyPost.author.handle)}</a>
+    </p>
+    ${postHtml}
+    ${embedHtml}
+    <p>
+        <a href="${postLink}">${replyPost.replyCount} replies</a>
+        <a href="${postLink}">${replyPost.repostCount + replyPost.quoteCount} reposts</a>
+        <a href="${postLink}">${replyPost.likeCount} likes</a></p>
+    <div>${createHtmlForReplies(reply.replies)}</div>
+</div>`
         }
         return htmlText
     }
 
-    var atPostUri = "at://did:plc:{{integrations.bluesky.userId}}/app.bsky.feed.post/{{bskyPostId}}"
-    httpGetAsJsonAsync(
-        "https://public.api.bsky.app/xrpc/app.bsky.feed.getPostThread?uri=" + atPostUri,
-        function (responseJson) {
-            const thread = responseJson["thread"]
-            const threadPost = thread["post"]
-            const postLink = getPostLinkFromUri(threadPost.uri)
+    const atPostUri = "at://did:plc:{{integrations.bluesky.userId}}/app.bsky.feed.post/{{bskyPostId}}"
+    const postUrl = "https://public.api.bsky.app/xrpc/app.bsky.feed.getPostThread?uri=" + atPostUri
+    window.fetch(postUrl).then(async (response) => {
+        const responseJson = await response.json()
+        const thread = responseJson["thread"]
+        const threadPost = thread["post"]
+        const postLink = getPostLinkFromUri(threadPost.uri)
 
-            const threadReplies = thread.replies
-            document.getElementById("social-section").innerHTML = `
+        const threadReplies = thread.replies
+        document.getElementById("social-section").innerHTML = `
 <h3>
     <a href="${postLink}">
         <span class='icon'>{{{getIcon 'corner-up-left' stroke='blue' stroke-width=3 width='1em' height='1em'}}}</span> <span class='text'>${threadPost.replyCount}</span>
@@ -154,6 +139,5 @@
 <div>
 ${threadReplies.length > 0 ? createHtmlForReplies(threadReplies) : "<p>No comments to display</p>"}
 </div>`
-        },
-    )
+    })
 </script>
