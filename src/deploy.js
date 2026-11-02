@@ -109,15 +109,44 @@ async function deployToNeocities(deployConfig, verifyOnly = false) {
             const siteInfo = await client.info()
             result.success = siteInfo.result === "success"
         } else {
-            // TODO bug: static folder not being uploaded
-            // maybe only happens on first attempt?
-            const deployResult = await client.deploy({
+            const siteListResult = await client.list()
+            const pathsToDelete = siteListResult.files
+                .map((f) => f.path)
+                // don't delete index or contents of folders (all dirs will be deleted anyway)
+                .filter((path) => !path.includes("/") && path !== "index.html")
+            if (pathsToDelete.length > 0) {
+                await client.delete(pathsToDelete)
+            }
+            // could use filesToDelete from previewDeply(), but it leaves empty folders behind
+            const { filesToUpload } = await client.previewDeploy({
                 directory: activeProject.paths.OUTPUT,
-                cleanup: true, // Delete orphaned files
-                includeUnsupportedFiles: false, // TODO - atproto-did unsupported, paid feature
+                includeUnsupportedFiles: false,
             })
-            logger.info(JSON.stringify(deployResult))
-            result.success = deployResult.results[0].body.result == "success"
+            // split files by their directory
+            // reason: neocities api may have issues handling combined file + folder uploads
+            const dirsToUpload = []
+            for (const file of filesToUpload) {
+                const parts = file.name.split("/")
+                parts.pop()
+                const dir = parts.join("/")
+                const depth = parts.length
+                const dirEntry = dirsToUpload.find((entry) => entry.dir === dir)
+                if (!dirEntry) {
+                    dirsToUpload.push({ dir, files: [file], depth })
+                } else {
+                    dirEntry.files.push(file)
+                }
+            }
+            // sort files by their directory depth, shallowest first
+            dirsToUpload.sort((a, b) => a.depth - b.depth)
+            result.success = true
+            for (const dir of dirsToUpload) {
+                const uploadResult = await client.upload(dir.files)
+                result.success = uploadResult.results.every(
+                    ({ body }) => body.result === "success",
+                )
+                if (!result.success) break
+            }
         }
     } catch (err) {
         logger.error(err)
