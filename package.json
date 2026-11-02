@@ -1,6 +1,6 @@
 {
     "name": "bimbo",
-    "description": "static site generator for dumb girls",
+    "description": "a website building tool for dumb girls",
     "author": "izzy kestrel",
     "license": "MIT",
     "version": "0.12.0-beta",

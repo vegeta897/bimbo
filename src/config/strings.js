@@ -27,14 +27,14 @@ export default {
         openPreview: `🔗 preview in browser`,
         openEditor: `👩‍💻 edit in vscodium`,
         openFolder: `📂 open project folder`,
-        configDeployment: "set up deployment",
-        configBsky: "set up bluesky integration",
-        deploy: (provider) => `🌐 deploy to ${provider}`,
+        configDeployment: "configure one-click upload",
+        configBsky: "configure bluesky integration",
+        deploy: (provider) => `🌐 upload to ${provider}`,
         bskyAutoPost: {
             enabled: (handle) => `🦋 autoposting to @${handle}`,
             disabled: "🦋 bluesky autoposting disabled",
         },
-        upgrade: `👀 get ${config.APP_NAME}+ for one-click deploy!`,
+        upgrade: `👀 get ${config.APP_NAME}+ for one-click upload!`,
         settings: {
             title: "settings",
             showProjectTitleInMenubar: "show active project title in menubar",
@@ -68,6 +68,7 @@ export default {
             `wrote user config to ${filepath} (${keys})`,
         deployStart: "🌐 user requested deployment",
         postDeployStart: "starting secondary deployment",
+        configParseFailed: (filepath) => `failed to parse ${filepath}, site builds paused until fixed`
     },
     update: {
         none: "no updates available",
@@ -77,7 +78,7 @@ export default {
         logError: (e) => `Error getting latest version: ${e}`,
     },
     popups: {
-        configDeploymentTitle: `set up deployment - ${config.APP_NAME}`,
+        configDeploymentTitle: `configure upload - ${config.APP_NAME}`,
         codiumError:
             "VSCodium was not found - if it's installed, please open it and go to View > Command Palette... > Shell Command: Install 'codium' command in PATH",
         disableCrashReporting: {
@@ -89,13 +90,13 @@ export default {
             confirm: "nah disable please",
             cancel: "oh alright leave it on",
         },
-        upgrade: `get ${config.APP_NAME}+ to enable one-click deployment options!`,
+        upgrade: `get ${config.APP_NAME}+ to enable one-click upload!`,
         deployFail: (provider) =>
             `unable to authenticate with ${provider}, please check your credentials and try again`,
         genericError: "something went wrong",
         confirmDeployment: {
             message: (title, provider) =>
-                `are you sure you want to deploy ${title} to ${provider}?`,
+                `are you sure you want to upload ${title} to ${provider}?`,
             confirm: "yeah!!",
             cancel: "not yet...",
         },
@@ -112,18 +113,18 @@ export default {
             success: (provider) => `${provider} auth successful`,
             fail: (provider) => `${provider} auth failed`,
         },
-        start: (provider) => `starting deployment to ${provider}`,
+        start: (provider) => `starting upload to ${provider}`,
         finish: {
             success: (isPostDeploy = false) =>
-                `${isPostDeploy ? "post-" : ""}deployment completed successfully 💅`,
-            fail: "deployment failed 🙇‍♀️",
+                `${isPostDeploy ? "post-" : ""}upload completed successfully 💅`,
+            fail: "upload failed 🙇‍♀️",
         },
-        cancel: "deployment canceled",
+        cancel: "upload canceled",
         urlCheck: {
             success: (url) => `confirmed remote page is live: ${url}`,
             fail: (url) => `unable to resolve remote url: ${url}`,
         },
-        queuedPosts: "found queued Bluesky posts, beginning post-deploy",
+        queuedPosts: "found queued Bluesky posts, beginning post-upload",
         bskyPostSkipped: "skipping Bluesky post for unresolved page",
         nekowebSiteInfoFail: "failed to get site info - check API key is valid",
     },
@@ -138,9 +139,9 @@ export default {
             postSuccess: (url) => `successfully posted to Bluesky! ${url}`,
         },
         buildStart: (isPostDeploy) =>
-            `👷‍♀️ ${isPostDeploy ? "post deploy " : ""}site build starting...`,
+            `👷‍♀️ ${isPostDeploy ? "post-upload " : ""}site build starting...`,
         buildComplete: (isPostDeploy) =>
-            `${isPostDeploy ? "post deploy " : ""}site build completed 💅`,
+            `${isPostDeploy ? "post-upload " : ""}site build completed 💅`,
         missingContentFolder:
             "project is missing required 'content' folder, aborting build",
         missingTemplate: "couldn't find template, using default",
