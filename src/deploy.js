@@ -112,8 +112,13 @@ async function deployToNeocities(deployConfig, verifyOnly = false) {
             const siteListResult = await client.list()
             const pathsToDelete = siteListResult.files
                 .map((f) => f.path)
-                // don't delete index or contents of folders (all dirs will be deleted anyway)
-                .filter((path) => !path.includes("/") && path !== "index.html")
+                .filter(
+                    (path) =>
+                        // excluding from deletion
+                        !path.includes("/") && // folder contents (all dirs will be deleted anyway)
+                        path !== "index.html" && // index (can't be deleted on neocities)
+                        path !== ".well-known/atproto-did", // atproto (can't be uploaded via api)
+                )
             if (pathsToDelete.length > 0) {
                 await client.delete(pathsToDelete)
             }
