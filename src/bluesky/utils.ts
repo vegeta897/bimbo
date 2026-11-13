@@ -82,7 +82,7 @@ const createBlueskyEmbedCard = async (
 const getBlueskyAgent = async () => {
     const { AtpAgent } = await import("@atproto/api")
     const agent = new AtpAgent({
-        service: "https://bsky.social",
+        service: "https://bsky.social", // TODO support other services (e.g. northsky.social)
     })
 
     // @ts-expect-error - activeProject has no defined type yet
